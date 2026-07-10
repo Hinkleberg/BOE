@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://bs2sweoklwpi6"]
+
+[ext_resource type="Script" uid="uid://dbgco6b6e5w6y" path="res://BlockImageEngineDemo.gd" id="1_a202f"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_uixtb"]
+
+[node name="Node3D" type="Node3D" unique_id=1266829551]
+script = ExtResource("1_a202f")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1563403524]
+mesh = SubResource("BoxMesh_uixtb")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=150901723]
+transform = Transform3D(1, 0, 0, 0, 0.9659258, 0.25881904, 0, -0.25881904, 0.9659258, 0, 2, 5)

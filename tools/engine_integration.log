@@ -1,0 +1,22 @@
+COMMAND: python3 -m py_compile tools/run_server.py
+RESULT: success
+
+COMMAND: python3 -m py_compile src/block_engine/bridges/military_adapter.py
+RESULT: success
+
+COMMAND: python3 -u tools/run_server.py --world-size 16 --render-port 9000 --no-ue --no-unity --no-godot --no-o3de
+RESULT: terminated after 6s by test harness
+
+OUTPUT:
+Render feed bound on 127.0.0.1:9006
+Render feed listening on 127.0.0.1:9006
+Skipping Unreal adapter
+Skipping Unity adapter
+Skipping Godot adapter
+Skipping O3DE adapter
+Military DIS adapter configured on port 3000
+[MilitarySimAdapter] Started. DIS port=3000, HLA federation=None
+[t=2.0s] tick=40 health=HEALTHY mirror_count=0
+[DIS TX] 68 bytes
+[t=4.0s] tick=80 health=HEALTHY mirror_count=0
+[DIS TX] 68 bytes
