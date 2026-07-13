@@ -97,6 +97,10 @@ class OmniverseConnector(DuplexAdapter):
             port=port,
             max_clients=max_clients,
         )
+        # Set platform identifier for entity sync hub
+        from entity_sync import PlatformType
+        self._platform_type = PlatformType.OMNIVERSE
+        
         self._nucleus_url = nucleus_server_url
         self._stage_path = usd_stage_path
         self._change_listeners: list = []

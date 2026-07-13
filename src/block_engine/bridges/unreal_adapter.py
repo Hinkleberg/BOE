@@ -117,6 +117,10 @@ class UnrealAdapter(DuplexAdapter):
             heartbeat_interval=5.0,
             client_timeout=30.0,
         )
+        # Set platform identifier for entity sync hub
+        from entity_sync import PlatformType
+        self._platform_type = PlatformType.UNREAL
+        
         self._write_queue: queue.Queue = queue.Queue(maxsize=10000)
         self._entity_updates: Dict[int, UnrealEntityUpdate] = {}
         self._event_callbacks: Dict[str, list] = {}  # event_type → [callback, ...]

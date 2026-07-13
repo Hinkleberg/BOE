@@ -200,6 +200,10 @@ class RobloxHTTPAdapter(DuplexAdapter):
             port=duplex_port,
             max_clients=max_clients,
         )
+        # Set platform identifier for entity sync hub
+        from bridges.entity_sync import PlatformType
+        self._platform_type = PlatformType.ROBLOX
+        
         self._http_server: Optional[ThreadingHTTPServer] = None
         self._http_thread: Optional[threading.Thread] = None
 

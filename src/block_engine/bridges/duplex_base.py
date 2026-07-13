@@ -28,6 +28,16 @@ from dataclasses import asdict, dataclass, field
 from enum import IntEnum
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from entity_sync import (
+    EntitySyncHub,
+    EntityEvent,
+    EntityEventType,
+    EntityState,
+    Transform,
+    PlatformType,
+    get_entity_sync_hub,
+)
+
 
 class MessageType(IntEnum):
     """Enumeration of message types for duplex communication."""
@@ -36,6 +46,7 @@ class MessageType(IntEnum):
     BLOCK_DELTA = 0x10
     ENTITY_DELTA = 0x11
     STATE_UPDATE = 0x12
+    ENTITY_SYNC_EVENT = 0x13       # Cross-adapter entity sync
     PING = 0x1F
     
     # Client → Server (commands, writes, events)
@@ -46,6 +57,7 @@ class MessageType(IntEnum):
     SUBSCRIBE = 0x24
     UNSUBSCRIBE = 0x25
     COMMAND = 0x26
+    ENTITY_COMMAND = 0x27         # Modify entity across all platforms
     PONG = 0x2F
     
     # Errors & responses
@@ -160,6 +172,10 @@ class DuplexAdapter:
         self._write_queue: queue.Queue = queue.Queue(maxsize=10000)
         self._write_callbacks: List[Callable[[WriteRequest], None]] = []
         
+        # Entity synchronization hub for cross-adapter real-time updates
+        self._entity_sync_hub = get_entity_sync_hub()
+        self._platform_type = 0  # Subclasses should set this (e.g., PlatformType.UNREAL)
+        
         self._stats = {
             "messages_sent": 0,
             "messages_recv": 0,
@@ -207,6 +223,9 @@ class DuplexAdapter:
             target=self._write_processor, daemon=True, name=f"{self.__class__.__name__}-write"
         )
         t_write.start()
+        
+        # Register entity sync hub listener
+        self._entity_sync_hub.add_listener(self._on_entity_sync_event)
         
         print(f"[{self.__class__.__name__}] Listening on {self._host}:{self._port}")
     
@@ -366,6 +385,8 @@ class DuplexAdapter:
                 self._handle_unsubscribe(client, msg)
             elif msg.msg_type == MessageType.COMMAND:
                 self._handle_command(client, msg)
+            elif msg.msg_type == MessageType.ENTITY_COMMAND:
+                self._handle_entity_command(client, msg)
         except Exception as e:
             self._send_error(client, msg.msg_id, str(e))
     
@@ -493,6 +514,136 @@ class DuplexAdapter:
             payload={"status": "ok", "command": msg.payload.get("command")}
         )
         client.enqueue_send(response)
+    
+    def _handle_entity_command(self, client: DuplexClient, msg: DuplexMessage) -> None:
+        """
+        Handle cross-adapter entity synchronization commands.
+        
+        Examples:
+          - Create entity in Unreal
+          - Modify entity in Blender (position, rotation, scale)
+          - Update entity in Omniverse (materials, properties)
+          - All other connected adapters receive the update in real-time
+        """
+        try:
+            payload = msg.payload
+            command = payload.get("command")
+            entity_id = payload.get("entity_id", 0)
+            platform_entity_name = payload.get("platform_entity_name", "")
+            entity_type = payload.get("entity_type", "default")
+            
+            # Build entity state
+            transform_data = payload.get("transform", {})
+            transform = Transform(
+                x=transform_data.get("x", 0.0),
+                y=transform_data.get("y", 0.0),
+                z=transform_data.get("z", 0.0),
+                rx=transform_data.get("rx", 0.0),
+                ry=transform_data.get("ry", 0.0),
+                rz=transform_data.get("rz", 0.0),
+                sx=transform_data.get("sx", 1.0),
+                sy=transform_data.get("sy", 1.0),
+                sz=transform_data.get("sz", 1.0),
+            )
+            
+            entity_state = EntityState(
+                entity_id=entity_id,
+                platform_id=self._platform_type,
+                platform_entity_name=platform_entity_name,
+                entity_type=entity_type,
+                transform=transform,
+                color=tuple(payload.get("color", [1.0, 1.0, 1.0])),
+                visible=payload.get("visible", True),
+                locked=payload.get("locked", False),
+                parent_entity_id=payload.get("parent_entity_id"),
+                metadata=payload.get("metadata", {}),
+            )
+            
+            # Register/update entity in hub
+            entity_id = self._entity_sync_hub.register_entity(entity_state)
+            
+            # Determine event type
+            if command == "create":
+                event_type = EntityEventType.ENTITY_CREATED
+            elif command == "move":
+                event_type = EntityEventType.ENTITY_MOVED
+            elif command == "rotate":
+                event_type = EntityEventType.ENTITY_ROTATED
+            elif command == "scale":
+                event_type = EntityEventType.ENTITY_SCALED
+            elif command == "modify":
+                event_type = EntityEventType.ENTITY_MODIFIED
+            elif command == "delete":
+                event_type = EntityEventType.ENTITY_DESTROYED
+            elif command == "attach":
+                event_type = EntityEventType.ENTITY_ATTACHED
+            elif command == "detach":
+                event_type = EntityEventType.ENTITY_DETACHED
+            elif command == "show":
+                event_type = EntityEventType.ENTITY_VISIBLE
+            else:
+                event_type = EntityEventType.ENTITY_MODIFIED
+            
+            # Create event
+            event = EntityEvent(
+                event_type=event_type,
+                entity_state=entity_state,
+                changed_fields=payload.get("changed_fields", []),
+                source_platform=self._platform_type,
+                source_client_id=f"{client.client_id}",
+                timestamp=time.time(),
+            )
+            
+            # Broadcast to all other adapters through hub
+            self._entity_sync_hub.on_entity_event(event)
+            
+            # Send ACK back to client
+            response = DuplexMessage(
+                msg_type=MessageType.RESPONSE,
+                msg_id=msg.msg_id,
+                payload={"status": "entity_synced", "entity_id": entity_id}
+            )
+            client.enqueue_send(response)
+            
+        except Exception as e:
+            self._send_error(client, msg.msg_id, f"Entity command failed: {str(e)}")
+    
+    def _on_entity_sync_event(self, event: EntityEvent) -> None:
+        """
+        Called when ANY adapter broadcasts an entity change.
+        Forwards the change to all THIS adapter's connected clients.
+        """
+        # Skip if event originated from this adapter (avoid duplicate sends)
+        if event.source_platform == self._platform_type:
+            return
+        
+        try:
+            # Serialize event to DPLX message
+            msg = DuplexMessage(
+                msg_type=MessageType.ENTITY_SYNC_EVENT,
+                msg_id=0,  # Unsolicited broadcast
+                payload={
+                    "event_type": event.event_type,
+                    "entity_id": event.entity_state.entity_id,
+                    "platform_entity_name": event.entity_state.platform_entity_name,
+                    "entity_type": event.entity_state.entity_type,
+                    "transform": asdict(event.entity_state.transform or Transform()),
+                    "color": event.entity_state.color,
+                    "visible": event.entity_state.visible,
+                    "locked": event.entity_state.locked,
+                    "metadata": event.entity_state.metadata or {},
+                    "source_platform": event.source_platform,
+                    "timestamp": event.timestamp,
+                }
+            )
+            
+            # Broadcast to all connected clients
+            with self._lock:
+                for client in self._clients.values():
+                    client.enqueue_send(msg)
+        except Exception as e:
+            print(f"[{self.__class__.__name__}] Entity sync broadcast error: {e}")
+    
     
     def _heartbeat_loop(self) -> None:
         """Send periodic ping to all clients."""

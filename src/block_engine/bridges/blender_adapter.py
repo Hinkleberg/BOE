@@ -88,6 +88,9 @@ class BlenderAdapter(DuplexAdapter):
             port=port,
             max_clients=max_clients,
         )
+        # Set platform identifier for entity sync hub
+        from entity_sync import PlatformType
+        self._platform_type = PlatformType.BLENDER
         # Legacy API cache
         self._cache: Dict[int, BlenderBlockData] = {}
     
