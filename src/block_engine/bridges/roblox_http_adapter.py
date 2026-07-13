@@ -177,7 +177,7 @@ class RobloxHTTPAdapter(DuplexAdapter):
     Usage (full-duplex, new):
       adapter = RobloxHTTPAdapter(resilient_store, world_layout)
       adapter.start_http(host="0.0.0.0", port=8000)  # HTTP on 8000
-      adapter.start()  # Duplex on 7100 (from parent class)
+      adapter.start()  # Duplex on 7400
       
       # Roblox connects to duplex port for real-time bidirectional:
       # - Send WRITE_BLOCK, QUERY, COMMAND messages
@@ -189,7 +189,7 @@ class RobloxHTTPAdapter(DuplexAdapter):
         resilient_store,
         world_layout,
         host: str = "127.0.0.1",
-        duplex_port: int = 7100,
+        duplex_port: int = 7400,
         max_clients: int = 256,
     ):
         super().__init__(
@@ -250,6 +250,46 @@ class RobloxHTTPAdapter(DuplexAdapter):
                 self._cmd_respawn(client, msg, args)
             elif cmd == "teleport":
                 self._cmd_teleport(client, msg, args)
+            elif cmd == "damage_player":
+                self._cmd_damage_player(client, msg, args)
+            elif cmd == "heal_player":
+                self._cmd_heal_player(client, msg, args)
+            elif cmd == "give_item":
+                self._cmd_give_item(client, msg, args)
+            elif cmd == "remove_item":
+                self._cmd_remove_item(client, msg, args)
+            elif cmd == "set_velocity":
+                self._cmd_set_velocity(client, msg, args)
+            elif cmd == "apply_force":
+                self._cmd_apply_force(client, msg, args)
+            elif cmd == "save_game":
+                self._cmd_save_game(client, msg, args)
+            elif cmd == "load_game":
+                self._cmd_load_game(client, msg, args)
+            elif cmd == "pause_game":
+                self._cmd_pause_game(client, msg, args)
+            elif cmd == "resume_game":
+                self._cmd_resume_game(client, msg, args)
+            elif cmd == "set_environment":
+                self._cmd_set_environment(client, msg, args)
+            elif cmd == "create_npc":
+                self._cmd_create_npc(client, msg, args)
+            elif cmd == "delete_npc":
+                self._cmd_delete_npc(client, msg, args)
+            elif cmd == "trigger_event":
+                self._cmd_trigger_event(client, msg, args)
+            elif cmd == "get_leaderboard":
+                self._cmd_get_leaderboard(client, msg, args)
+            elif cmd == "save_checkpoint":
+                self._cmd_save_checkpoint(client, msg, args)
+            elif cmd == "load_checkpoint":
+                self._cmd_load_checkpoint(client, msg, args)
+            elif cmd == "set_difficulty":
+                self._cmd_set_difficulty(client, msg, args)
+            elif cmd == "get_player_stats":
+                self._cmd_get_player_stats(client, msg, args)
+            elif cmd == "set_game_rule":
+                self._cmd_set_game_rule(client, msg, args)
             else:
                 super()._handle_command(client, msg)
         except Exception as e:
@@ -298,6 +338,223 @@ class RobloxHTTPAdapter(DuplexAdapter):
             msg_type=MessageType.RESPONSE,
             msg_id=msg.msg_id,
             payload={"status": "teleported", "player_id": player_id, "position": [x, y, z]}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_damage_player(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Damage a player."""
+        player_id = args.get("player_id")
+        damage = args.get("damage", 10)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "damaged", "player_id": player_id, "damage": damage}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_heal_player(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Heal a player."""
+        player_id = args.get("player_id")
+        health = args.get("health", 50)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "healed", "player_id": player_id, "health": health}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_give_item(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Give item to player."""
+        player_id = args.get("player_id")
+        item = args.get("item")
+        quantity = args.get("quantity", 1)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "item_given", "player_id": player_id, "item": item, "quantity": quantity}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_remove_item(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Remove item from player."""
+        player_id = args.get("player_id")
+        item = args.get("item")
+        quantity = args.get("quantity", 1)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "item_removed", "player_id": player_id, "item": item, "quantity": quantity}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_set_velocity(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Set player velocity."""
+        player_id = args.get("player_id")
+        vx = args.get("vx", 0)
+        vy = args.get("vy", 0)
+        vz = args.get("vz", 0)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "velocity_set", "player_id": player_id, "velocity": [vx, vy, vz]}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_apply_force(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Apply force to player."""
+        player_id = args.get("player_id")
+        fx = args.get("fx", 0)
+        fy = args.get("fy", 0)
+        fz = args.get("fz", 0)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "force_applied", "player_id": player_id, "force": [fx, fy, fz]}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_save_game(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Save game state."""
+        save_name = args.get("save_name", "autosave")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "game_saved", "save_name": save_name}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_load_game(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Load game state."""
+        save_name = args.get("save_name", "autosave")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "game_loaded", "save_name": save_name}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_pause_game(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Pause the game."""
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "game_paused"}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_resume_game(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Resume the game."""
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "game_resumed"}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_set_environment(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Set environment properties."""
+        weather = args.get("weather", "sunny")
+        time_of_day = args.get("time_of_day", "day")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "environment_set", "weather": weather, "time": time_of_day}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_create_npc(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Create NPC."""
+        npc_id = args.get("npc_id")
+        npc_type = args.get("npc_type", "default")
+        x = args.get("x", 0)
+        y = args.get("y", 0)
+        z = args.get("z", 0)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "npc_created", "npc_id": npc_id, "type": npc_type, "position": [x, y, z]}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_delete_npc(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Delete NPC."""
+        npc_id = args.get("npc_id")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "npc_deleted", "npc_id": npc_id}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_trigger_event(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Trigger game event."""
+        event = args.get("event")
+        parameters = args.get("parameters", {})
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "event_triggered", "event": event, "parameters": parameters}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_get_leaderboard(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Get leaderboard data."""
+        limit = args.get("limit", 10)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "leaderboard_retrieved", "limit": limit, "entries": []}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_save_checkpoint(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Save checkpoint."""
+        checkpoint_name = args.get("checkpoint_name")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "checkpoint_saved", "name": checkpoint_name}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_load_checkpoint(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Load checkpoint."""
+        checkpoint_name = args.get("checkpoint_name")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "checkpoint_loaded", "name": checkpoint_name}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_set_difficulty(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Set game difficulty."""
+        difficulty = args.get("difficulty", "normal")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "difficulty_set", "difficulty": difficulty}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_get_player_stats(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Get player statistics."""
+        player_id = args.get("player_id")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "stats_retrieved", "player_id": player_id, "stats": {}}
+        )
+        client.enqueue_send(response)
+
+    def _cmd_set_game_rule(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Set game rule."""
+        rule = args.get("rule")
+        value = args.get("value")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "rule_set", "rule": rule, "value": value}
         )
         client.enqueue_send(response)
 

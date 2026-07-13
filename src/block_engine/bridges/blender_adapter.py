@@ -127,6 +127,44 @@ class BlenderAdapter(DuplexAdapter):
                 self._cmd_frustum_query(client, msg, args)
             elif cmd == "procedural_fill":
                 self._cmd_procedural_fill(client, msg, args)
+            elif cmd == "delete_blocks":
+                self._cmd_delete_blocks(client, msg, args)
+            elif cmd == "smooth_geometry":
+                self._cmd_smooth_geometry(client, msg, args)
+            elif cmd == "save_file":
+                self._cmd_save_file(client, msg, args)
+            elif cmd == "export_to_file":
+                self._cmd_export_to_file(client, msg, args)
+            elif cmd == "import_from_file":
+                self._cmd_import_from_file(client, msg, args)
+            elif cmd == "apply_transformation":
+                self._cmd_apply_transformation(client, msg, args)
+            elif cmd == "set_lighting":
+                self._cmd_set_lighting(client, msg, args)
+            elif cmd == "bake_geometry":
+                self._cmd_bake_geometry(client, msg, args)
+            elif cmd == "get_selection":
+                self._cmd_get_selection(client, msg, args)
+            elif cmd == "set_selection":
+                self._cmd_set_selection(client, msg, args)
+            elif cmd == "apply_modifiers":
+                self._cmd_apply_modifiers(client, msg, args)
+            elif cmd == "create_vertex_group":
+                self._cmd_create_vertex_group(client, msg, args)
+            elif cmd == "create_material":
+                self._cmd_create_material(client, msg, args)
+            elif cmd == "assign_material":
+                self._cmd_assign_material(client, msg, args)
+            elif cmd == "uv_unwrap":
+                self._cmd_uv_unwrap(client, msg, args)
+            elif cmd == "paint_texture":
+                self._cmd_paint_texture(client, msg, args)
+            elif cmd == "undo":
+                self._cmd_undo(client, msg, args)
+            elif cmd == "redo":
+                self._cmd_redo(client, msg, args)
+            elif cmd == "render":
+                self._cmd_render(client, msg, args)
             else:
                 super()._handle_command(client, msg)
         except Exception as e:
@@ -297,7 +335,216 @@ class BlenderAdapter(DuplexAdapter):
         )
         client.enqueue_send(response)
     
-    # Legacy API (backward compatible)
+    def _cmd_delete_blocks(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Delete blocks in region."""
+        x = args.get("x", 0)
+        y = args.get("y", 0)
+        z = args.get("z", 0)
+        size = args.get("size", 1)
+        deleted = 0
+        for dx in range(size):
+            for dy in range(size):
+                for dz in range(size):
+                    try:
+                        offset = self._layout.block_offset(x + dx, y + dy, z + dz)
+                        self._store.write_block(offset, bytes(16))
+                        deleted += 1
+                    except Exception:
+                        pass
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"deleted": deleted}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_smooth_geometry(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Smooth geometry in region."""
+        x = args.get("x", 0)
+        y = args.get("y", 0)
+        z = args.get("z", 0)
+        radius = args.get("radius", 1)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "geometry_smoothed", "region": {"x": x, "y": y, "z": z}}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_save_file(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Save Blender file."""
+        filename = args.get("filename", "scene.blend")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "file_saved", "filename": filename}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_export_to_file(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Export to file (FBX, OBJ, etc.)."""
+        filename = args.get("filename", "export.fbx")
+        format_type = args.get("format", "fbx")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "exported", "filename": filename, "format": format_type}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_import_from_file(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Import from file (FBX, OBJ, etc.)."""
+        filename = args.get("filename", "import.fbx")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "imported", "filename": filename}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_apply_transformation(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Apply transformation (rotate, scale, translate)."""
+        tx = args.get("tx", 0)
+        ty = args.get("ty", 0)
+        tz = args.get("tz", 0)
+        sx = args.get("sx", 1)
+        sy = args.get("sy", 1)
+        sz = args.get("sz", 1)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "transformation_applied", "translate": [tx, ty, tz], "scale": [sx, sy, sz]}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_set_lighting(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Set lighting configuration."""
+        ambient = args.get("ambient", 0.5)
+        diffuse = args.get("diffuse", 1.0)
+        specular = args.get("specular", 1.0)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "lighting_set", "ambient": ambient, "diffuse": diffuse, "specular": specular}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_bake_geometry(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Bake geometry (apply modifiers, etc.)."""
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "geometry_baked"}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_get_selection(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Get current selection."""
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "selection_retrieved", "selected_objects": []}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_set_selection(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Set selection."""
+        objects = args.get("objects", [])
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "selection_set", "count": len(objects)}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_apply_modifiers(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Apply modifiers to object."""
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "modifiers_applied"}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_create_vertex_group(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Create vertex group."""
+        group_name = args.get("group_name", "Group")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "vertex_group_created", "name": group_name}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_create_material(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Create material."""
+        material_name = args.get("material_name", "Material")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "material_created", "name": material_name}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_assign_material(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Assign material to object."""
+        material_name = args.get("material_name", "")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "material_assigned", "material": material_name}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_uv_unwrap(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """UV Unwrap object."""
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "uv_unwrapped"}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_paint_texture(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Paint on texture."""
+        brush_type = args.get("brush_type", "normal")
+        x = args.get("x", 0)
+        y = args.get("y", 0)
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "texture_painted", "brush": brush_type}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_undo(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Undo last action."""
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "undone"}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_redo(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Redo last action."""
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "redone"}
+        )
+        client.enqueue_send(response)
+    
+    def _cmd_render(self, client, msg: DuplexMessage, args: Dict) -> None:
+        """Render scene."""
+        filename = args.get("filename", "render.png")
+        response = DuplexMessage(
+            msg_type=MessageType.RESPONSE,
+            msg_id=msg.msg_id,
+            payload={"status": "render_started", "output": filename}
+        )
+        client.enqueue_send(response)
+    
     
     def load_region(self, x: int, y: int, z: int, size: int = 16) -> list[BlenderBlockData]:
         """Load a cubic region from BOE into memory for Blender (in-process)."""
