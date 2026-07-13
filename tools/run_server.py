@@ -44,9 +44,9 @@ from services.mutation_engine import MutationEngine
 from interface.render_delta import BlockDelta, EntityDelta, RenderDelta
 from interface.render_feed import RenderFeedServer
 from bridges.unreal_adapter import UnrealAdapter
-from bridges.unity_adapter import UnityAdapter
+from bridges.deprecated.unity_adapter import UnityAdapter
 from bridges.godot_adapter import GodotAdapter
-from bridges.O3de_adapter import O3DEAdapter
+from bridges.deprecated.O3de_adapter import O3DEAdapter
 from bridges.military_adapter import CoordOrigin, MilitarySimAdapter
 
 WORLD_PATH = "world.img"
@@ -127,11 +127,15 @@ class LocalRenderFeed:
 
 
 async def main():
-    ap = argparse.ArgumentParser(description="Start the local engine with optional UE5/Unity/Godot adapters")
+    print("⚠️  DEPRECATION NOTICE: tools/run_server.py is deprecated and uses legacy non-duplex adapters.")
+    print("    Recommended: Use start_duplex_server.py instead (full-duplex adapters, entity sync).")
+    print("    See PORT_ALLOCATION.md and docs/COMMANDS.md for current port assignments.\n")
+
+    ap = argparse.ArgumentParser(description="[DEPRECATED] Start the local engine with optional UE5/Unity/Godot adapters")
     ap.add_argument("--ue-port", type=int, default=7100, help="Unreal adapter port")
-    ap.add_argument("--unity-port", type=int, default=7200, help="Unity adapter port")
-    ap.add_argument("--godot-port", type=int, default=7300, help="Godot adapter port")
-    ap.add_argument("--o3de-port", type=int, default=7400, help="O3DE adapter port")
+    ap.add_argument("--unity-port", type=int, default=7600, help="Unity adapter port (legacy, use start_duplex_server.py for 7503)")
+    ap.add_argument("--godot-port", type=int, default=7601, help="Godot adapter port (legacy, use start_duplex_server.py for 7500)")
+    ap.add_argument("--o3de-port", type=int, default=7602, help="O3DE adapter port (legacy, use start_duplex_server.py for 7502)")
     ap.add_argument("--dis-port", type=int, default=3000, help="DIS adapter port")
     ap.add_argument("--render-port", type=int, default=9000, help="Render feed port")
     ap.add_argument("--world-size", type=int, default=128, help="World size in blocks")

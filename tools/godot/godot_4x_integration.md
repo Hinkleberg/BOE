@@ -24,7 +24,7 @@ Block-Image Engine (Python)
 extends Node
 
 const ENGINE_HOST := "127.0.0.1"
-const ENGINE_PORT := 7400
+const ENGINE_PORT := 7500
 const BLOCK_SCALE := 0.66   # metres per block
 const WORLD_X := 64
 const WORLD_Y := 64

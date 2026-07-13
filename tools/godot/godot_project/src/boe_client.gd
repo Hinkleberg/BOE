@@ -2,7 +2,7 @@
 ## ──────────────
 ## Block-Offset-Engine client for Godot 4.x
 ##
-## Connects to the GodotAdapter TCP server (default port 7300) and
+## Connects to the GodotAdapter TCP server (default port 7500) and
 ## decodes incoming UBIE binary frames into usable Godot data.
 ##
 ## Wire protocol (matches unreal_adapter.py / godot_adapter.py):

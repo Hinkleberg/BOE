@@ -3,7 +3,7 @@ extends Node3D
 var socket: StreamPeerTCP = StreamPeerTCP.new()
 
 func _ready():
-	var err = socket.connect_to_host("127.0.0.1", 7300)
+	var err = socket.connect_to_host("127.0.0.1", 7500)
 	print("connect_to_host:", err)
 
 func _process(_delta):

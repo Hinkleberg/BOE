@@ -448,7 +448,7 @@ Terrain layers (bottom to top):
 Terrain uses a deterministic SHA-256-based noise function — no external dependencies. The same seed always produces the same world, which makes crash-recovery validation straightforward: regenerate and diff.
 
 ```
-python world_gen.py --size 64 --seed 42 --out world.db --array-b world_render.db
+python src/block_engine/environment/world_gen.py --size 64 --seed 42 --out world.db --array-b world_render.db
 ```
 
 ### run_server.py
@@ -461,7 +461,7 @@ Server loop: wires mutation engine, render feed, entity sidecar, and health moni
 - Health report prints every 2 seconds showing Array A/B `write_seq` lag.
 
 ```
-python run_server.py --array-a world.db --array-b world_render.db \
+python tools/run_server.py --array-a world.db --array-b world_render.db \
                      --sidecar entities.db --size 64 --duration 30
 ```
 
@@ -828,7 +828,7 @@ Standard library only for the storage layer — `sqlite3`, `zlib`, `hashlib`, `s
 **2. Generate a world:**
 
 ```
-python world_gen.py --size 64 --seed 42 --out world.db --array-b world_render.db
+python src/block_engine/environment/world_gen.py --size 64 --seed 42 --out world.db --array-b world_render.db
 ```
 
 Writes a 64×64×64 block world through the full mutation engine stack. Both Array A and Array B are populated. Size is snapped to the nearest 16-block chunk boundary.
@@ -836,7 +836,7 @@ Writes a 64×64×64 block world through the full mutation engine stack. Both Arr
 **3. Run the server:**
 
 ```
-python run_server.py --array-a world.db --array-b world_render.db --sidecar entities.db --size 64
+python tools/run_server.py --array-a world.db --array-b world_render.db --sidecar entities.db --size 64
 ```
 
 Runs at 20 Hz. Health report every 2 seconds. Ctrl-C for clean shutdown.

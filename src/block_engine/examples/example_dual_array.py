@@ -34,7 +34,7 @@ def main() -> None:
         jrn    = os.path.join(tmp, "world.jrn")
 
         store_a = FlatStore(path_a, layout)
-        store_b = RenderStore(path_b, layout, primary_fallback=store_a.read_block)
+        store_b = RenderStore(path_b, primary_fallback=store_a.read_block)
         rs      = ResilientStore(store_a, journal_path=jrn)
         rs.register_mirror(store_b.enqueue_forward_sync)
 

@@ -38,7 +38,7 @@ using UnityEngine;
 public class BlockImageReceiver : MonoBehaviour
 {
     public string EngineHost = "127.0.0.1";
-    public int    EnginePort = 7200;
+    public int    EnginePort = 7503;
     public int    WorldX = 64, WorldY = 64, WorldZ = 64;
     public float  BlockScale = 0.66f;   // metres per block
 
@@ -146,7 +146,7 @@ from core.render_feed import RenderFeed
 from tools.unity.unity_adapter import UnityAdapter
 
 layout  = WorldLayout(64, 64, 64)
-adapter = UnityAdapter(layout, host="127.0.0.1", port=7200)
+adapter = UnityAdapter(layout, host="127.0.0.1", port=7503)
 adapter.start()
 
 feed = RenderFeed(layout, store_b, sidecar, tick_rate_hz=20)

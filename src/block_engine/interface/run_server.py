@@ -44,16 +44,17 @@ def main() -> None:
     layout  = WorldLayout(args.size, args.size, args.size)
 
     store_a = FlatStore(args.array_a, layout)
-    store_b = RenderStore(args.array_b, layout, primary_fallback=store_a.read_block)
+    store_b = RenderStore(args.array_b, primary_fallback=store_a.read_block)
     rs      = ResilientStore(store_a, journal_path=args.journal)
     rs.register_mirror(store_b.enqueue_forward_sync)
 
     sidecar = EntitySidecar(args.sidecar)
 
-    # Engine adapters — UE5 :7100 | Unity :7200 | Godot :7300
+    # Engine adapters — UE5 :7100 | Blender :7200 | Omniverse :7300 | Roblox :7400 | Godot :7500 | O3DE :7502 | Unity :7503
+    # NOTE: This is legacy non-duplex configuration. Use start_duplex_server.py for full-duplex with entity sync.
     ue_adapter     = UnrealAdapter(layout, host="127.0.0.1", port=7100)
-    unity_adapter  = UnityAdapter(layout,  host="127.0.0.1", port=7200)
-    godot_adapter  = GodotAdapter(layout,  host="127.0.0.1", port=7300)
+    unity_adapter  = UnityAdapter(layout,  host="127.0.0.1", port=7503)
+    godot_adapter  = GodotAdapter(layout,  host="127.0.0.1", port=7500)
     ue_adapter.start()
     unity_adapter.start()
     godot_adapter.start()

@@ -5,7 +5,7 @@
 
 ```
 BOE Engine (Python)
-    └── GodotAdapter (port 7300)
+    └── GodotAdapter (port 7500)
             └── TCP → StreamPeerTCP
                     └── BOEClient.gd (Godot scene node)
                             ├── signal block_delta_received
@@ -13,10 +13,15 @@ BOE Engine (Python)
                             └── signal json_delta_received
 ```
 
-Port convention:
-- Unreal → 7100
-- Unity  → 7200
-- Godot  → 7300
+Port convention (current, from PORT_ALLOCATION.md 2026-07-12):
+- Unreal     → 7100
+- Blender    → 7200
+- Omniverse  → 7300
+- Roblox     → 7400/8000
+- Godot      → 7500
+- O3DE       → 7502
+- Unity      → 7503
+- WebBridge  → 7507
 
 ---
 
@@ -27,7 +32,7 @@ In your engine bootstrap (e.g. `run_server.py`):
 ```python
 from tools.godot.godot_adapter import GodotAdapter
 
-adapter = GodotAdapter(layout, host="127.0.0.1", port=7300)
+adapter = GodotAdapter(layout, host="127.0.0.1", port=7500)
 adapter.start()
 
 feed.connect_client(
@@ -43,7 +48,7 @@ feed.connect_client(
 
 1. Copy `boe_client.gd` into your Godot project (e.g. `res://src/boe_client.gd`)
 2. Add a Node to your scene, attach `boe_client.gd` as its script
-3. Set `host` and `port` in the Inspector (or leave defaults: 127.0.0.1:7300)
+3. Set `host` and `port` in the Inspector (or leave defaults: 127.0.0.1:7500)
 4. Connect signals to your game logic
 
 ```gdscript
@@ -92,7 +97,7 @@ frame_type 0x03 — JSON delta (use_binary=False on server)
 If you want human-readable frames for debugging:
 
 ```python
-adapter = GodotAdapter(layout, port=7300, use_binary=False)
+adapter = GodotAdapter(layout, port=7500, use_binary=False)
 ```
 
 On the Godot side, connect `json_delta_received` instead:
