@@ -40,6 +40,8 @@ from flat_store import FlatStore, ChecksumMismatchError, CapacityError
 from journal import Journal
 from replication_manager import ReplicationManager, QuorumError
 
+ObserverCallback = Callable[[dict], None]
+
 
 # ---------------------------------------------------------------------------
 # Block / health state
@@ -95,10 +97,12 @@ class ResilientStore:
         replication_manager:  Optional[ReplicationManager] = None,
         journal_path:         str = "world.jrn",
         recovery_callback:    Optional[RecoveryCallback] = None,
+        event_observer:       Optional[ObserverCallback] = None,
     ):
         self._store    = local_store
         self._rm       = replication_manager
         self._recovery = recovery_callback
+        self._observer = event_observer
         self._journal  = Journal(journal_path)
         self._lock     = threading.Lock()
         self._mirrors: List[MirrorCallback] = []
@@ -145,11 +149,15 @@ class ResilientStore:
             seq = self._store.write_seq + 1
 
         # 1. Journal
+        start = time.perf_counter()
         jpos = self._journal.append(offset, seq, data)
+        self._emit_event("journal_append", time.perf_counter() - start)
         self._set_state(offset, BlockState.PENDING)
 
         # 2. Write to flat image
+        start = time.perf_counter()
         self._store.write_block(offset, data)
+        self._emit_event("flat_store_write", time.perf_counter() - start)
         self._set_state(offset, BlockState.CLEAN)
         self._write_count += 1
 
@@ -157,7 +165,9 @@ class ResilientStore:
         if self._rm is not None:
             self._set_state(offset, BlockState.SYNCING)
             try:
+                start = time.perf_counter()
                 self._rm.replicate_block(offset, data, seq=self._store.write_seq)
+                self._emit_event("replicate", time.perf_counter() - start)
                 self._set_state(offset, BlockState.REPLICATED)
             except QuorumError:
                 # Locally durable; replication fell short of quorum
@@ -165,7 +175,9 @@ class ResilientStore:
                 raise
 
         # 4. Commit journal
+        start = time.perf_counter()
         self._journal.commit(jpos)
+        self._emit_event("journal_commit", time.perf_counter() - start)
         self._pending_replay.discard(offset)
 
         record = WriteRecord(offset=offset, seq=self._store.write_seq,
@@ -175,12 +187,14 @@ class ResilientStore:
         if self._mirrors:
             seq_snap = self._store.write_seq
             mirrors  = list(self._mirrors)
+            start = time.perf_counter()
             t = threading.Thread(
                 target=self._forward_to_mirrors,
                 args=(mirrors, offset, data, seq_snap),
                 daemon=True,
             )
             t.start()
+            self._emit_event("mirror_forward", time.perf_counter() - start)
 
         return record
 
@@ -229,6 +243,14 @@ class ResilientStore:
         )
 
     # --------------------------------------------------------------- helpers
+
+    def _emit_event(self, stage: str, duration_ms: float) -> None:
+        if self._observer is None:
+            return
+        try:
+            self._observer({"stage": stage, "duration_ms": duration_ms * 1000.0})
+        except Exception:
+            pass
 
     def _set_state(self, offset: int, state: BlockState) -> None:
         self._block_states[offset] = state
