@@ -120,16 +120,16 @@ This is a real inconsistency in the codebase, not a style choice — flagging it
 
 ```bash
 python tools/run_server.py \
-  --ue-port 7100 --unity-port 7200 --godot-port 7300 --o3de-port 7400 \
+  --ue-port 7100 --unity-port 7600 --godot-port 7601 --o3de-port 7602 \
   --dis-port 3000 --render-port 9000 --world-size 128
 ```
 
 **What it starts:**
 - RenderFeedServer
 - UnrealAdapter (7100)
-- UnityAdapter (7200) ← **Legacy, non-duplex version**
-- GodotAdapter (7300)
-- O3DEAdapter (7400) ← **Legacy, non-duplex version**
+- UnityAdapter (7600) ← **Legacy, non-duplex version (reassigned from 7200)**
+- GodotAdapter (7601) ← **Reassigned from 7300**
+- O3DEAdapter (7602) ← **Reassigned from 7400**
 - MilitarySimAdapter/DIS (3000)
 
 **Flags to skip adapters:**
