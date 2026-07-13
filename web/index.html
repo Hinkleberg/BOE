@@ -88,7 +88,7 @@
         logEl.textContent = `${new Date().toLocaleTimeString()}\n${text}`;
       }
 
-      const socket = new WebSocket('ws://127.0.0.1:7500/ws');
+      const socket = new WebSocket('ws://127.0.0.1:7507/ws');
       socket.addEventListener('open', () => {
         statusEl.innerHTML = '<span class="pill">live</span> connected';
         logMessage('WebSocket connected');
