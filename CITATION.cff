@@ -4,5 +4,12 @@ message: "If you use this software, please cite it as below."
 authors:
   - family-names: Hinkleberg
     given-names: Michael
-date-released: 2025-06-26
-url: "https://github.com/Hinkleberg/Block-Offset-Engine"
+date-released: 2026-07-12
+version: 2.0.0
+repository-code: "https://github.com/Hinkleberg/BOE"
+url: "https://github.com/Hinkleberg/BOE"
+license: MIT
+identifiers:
+  - description: "Zenodo DOI"
+    type: doi
+    value: "10.5281/zenodo.placeholder"  # Will be updated by Zenodo automatically
