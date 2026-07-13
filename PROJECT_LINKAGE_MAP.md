@@ -119,7 +119,7 @@
 | `test_render_store_queue.py` | `tests/` | Render layer tests | render_feed, render_store | ✓ Passing | imports render layer |
 | `test_v2.py` | `tests/` | V2 integration tests | Multiple | ✓ Passing | imports multiple modules |
 
-**Test Result:** 56/56 passing ✅
+**Test Result (local snapshot 2026-07-13):** 85 passed / 1 failed ⚠️
 
 ---
 
@@ -199,7 +199,7 @@ start_duplex_server.py
 | **Duplicate Functionality** | ✅ Resolved | Legacy files archived, correct versions active |
 | **Missing References** | ✅ 0 | All files imported/used somewhere |
 | **Port Conflicts** | ✅ 0 | All unique assignments verified |
-| **Test Coverage** | ✅ 56/56 | All tests passing |
+| **Test Coverage** | ⚠️ 85 passed / 1 failed | One known integration failure |
 
 ---
 
@@ -208,7 +208,7 @@ start_duplex_server.py
 **Total Files Analyzed:** 40+ Python files  
 **Files in Correct Location:** 100%  
 **Imports Working:** 100%  
-**Tests Passing:** 56/56 (100%)  
+**Tests Passing:** 85 passed / 1 failed (local snapshot)
 **Port Conflicts:** 0  
 **Orphaned Files:** 0  
 **Duplicate Functionality:** 0 (resolved)

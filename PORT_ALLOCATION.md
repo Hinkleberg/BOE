@@ -17,16 +17,16 @@ All full-duplex adapters using DPLX wire protocol.
 | **7500** | GodotAdapter | ✅ Active | Godot 3.x/4.x game engine |
 | **7502** | O3DEAdapter | ✅ Active | Amazon O3DE (was 7300 - fixed) |
 | **7503** | UnityAdapter | ✅ Active | Unity Engine (was 7200 - fixed) |
-| **7507** | WebBridge | ✅ Active | Web 3D / WebSocket (was 7500 - fixed) |
+| **7507** | WebBridge (Dev) | ✅ Active | Development viewport / WebSocket |
+| **7508** | WebBridge (Live) | ✅ Active | Live mirror viewport / WebSocket |
 | 7501 | *Reserved* | — | Future adapter |
 | 7504 | *Reserved* | — | Future adapter |
 | 7505 | *Reserved* | — | Future adapter |
 | 7506 | *Reserved* | — | Future adapter |
-| 7508 | *Reserved* | — | Future adapter |
 | 7509 | *Reserved* | — | Future adapter |
 
-**Total Active:** 8 adapters  
-**Total Reserved:** 6 ports for future expansion  
+**Total Active:** 9 endpoints  
+**Total Reserved:** 5 ports for future expansion  
 **Conflicts:** ZERO ✅
 
 ---
@@ -45,7 +45,8 @@ All full-duplex adapters using DPLX wire protocol.
 
 | Issue | Before | After | Reason |
 |-------|--------|-------|--------|
-| **WebBridge** | 7500 | 7507 | Conflicted with GodotAdapter |
+| **WebBridge (Dev)** | 7500 | 7507 | Conflicted with GodotAdapter |
+| **WebBridge (Live)** | N/A | 7508 | Added for dual environment compare mode |
 | **O3DEAdapter (old)** | 7300 | 7502 | Conflicted with OmniverseConnector; duplicate with duplex version |
 | **UnityAdapter (old)** | 7200 | 7503 | Conflicted with BlenderAdapter; duplicate with duplex version |
 
@@ -62,7 +63,8 @@ These accept TCP connections and use DPLX wire protocol:
 - GodotAdapter (7500)
 - O3DEAdapter (7502)
 - UnityAdapter (7503)
-- WebBridge (7507)
+- WebBridge Dev (7507)
+- WebBridge Live (7508)
 
 ### Domain Adapters (No network ports)
 These process data from entity_sidecar and render_feed, don't listen on ports:
@@ -80,15 +82,16 @@ These process data from entity_sidecar and render_feed, don't listen on ports:
 
 ## Launch Command Reference
 
-**Start all duplex adapters (8 adapters, 9 ports):**
+**Start all duplex adapters + dual compare viewports:**
 ```bash
 python start_duplex_server.py --adapters minimal
 python start_duplex_server.py --adapters all  # Same as minimal for now
+python start_duplex_server.py --adapters all --live-db world_live.db --web-dev-port 7507 --web-live-port 7508
 ```
 
 **Ports used:**
 ```
-7100, 7200, 7300, 7400, 7500, 7502, 7503, 7507, 8000
+7100, 7200, 7300, 7400, 7500, 7502, 7503, 7507, 7508, 8000
 ```
 
 **Verification:** All adapters shown in startup output with 0 conflicts.
@@ -106,7 +109,8 @@ python start_duplex_server.py --adapters all  # Same as minimal for now
 | 7500 | GodotAdapter | [GodotAdapter] Listening on 127.0.0.1:7500 ✓ |
 | 7502 | O3DEAdapter | [O3DEAdapter] Listening on 127.0.0.1:7502 ✓ |
 | 7503 | UnityAdapter | [UnityAdapter] Listening on 127.0.0.1:7503 ✓ |
-| 7507 | WebBridge | ✓ (WebSocket server active) |
+| 7507 | WebBridge (Dev) | ✓ (WebSocket server active) |
+| 7508 | WebBridge (Live) | ✓ (WebSocket server active) |
 | 8000 | RobloxHTTPAdapter | [RobloxHTTPAdapter] HTTP listening on 127.0.0.1:8000 ✓ |
 
 ---
@@ -116,7 +120,7 @@ python start_duplex_server.py --adapters all  # Same as minimal for now
 1. **start_duplex_server.py**
    - Updated port header documentation
    - Fixed imports to include WebBridge
-   - Added WebBridge startup (7507)
+   - Added WebBridge startup (7507 + 7508 dual mode)
    - Updated example commands to reflect all adapters
    - Added port allocation summary in output
 
@@ -149,7 +153,7 @@ python start_duplex_server.py --adapters all  # Same as minimal for now
 
 ## Future Expansion
 
-Reserved ports (7501, 7504-7506, 7508-7509) available for:
+Reserved ports (7501, 7504-7506, 7509) available for:
 - Godot4Bridge (7501) if converted to duplex
 - Additional platform adapters
 - Cloud/distributed simulation bridges
@@ -157,7 +161,7 @@ Reserved ports (7501, 7504-7506, 7508-7509) available for:
 
 ---
 
-**Last Updated:** 2026-07-12  
+**Last Updated:** 2026-07-13  
 **Status:** Production Ready  
 **Next Phase:** Phase 6 - Additional adapter integration
 

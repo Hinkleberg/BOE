@@ -190,7 +190,7 @@ src/block_engine/bridges/
 | Metric | Result | Status |
 |--------|--------|--------|
 | Files Analyzed | 40+ | ✅ Complete |
-| Test Passing Rate | 56/56 (100%) | ✅ Excellent |
+| Test Passing Rate | 85 passed / 1 failed (local snapshot 2026-07-13) | ⚠️ One known integration failure |
 | Import Failures | 0 | ✅ Perfect |
 | Port Conflicts | 0 | ✅ Perfect |
 | Files in Wrong Location | 0 | ✅ Perfect |

@@ -138,7 +138,7 @@ src/block_engine/
 | **Add Package Init Files** | ✅ Done | src/, block_engine/, bridges/ |
 | **Maintain Backward Compatibility** | ✅ Done | sys.path workaround still works |
 | **Update Imports** | ✅ Done | bridges/__init__.py provides clean exports |
-| **Run Tests** | ✅ Done | 56/56 tests pass |
+| **Run Tests** | ✅ Done | Local snapshot: 85 passed / 1 failed |
 | **Verify Adapter Startup** | ✅ Done | All adapters import correctly |
 | **Document Deprecation** | ✅ Done | deprecated/README.md migration guide |
 
@@ -172,7 +172,7 @@ src/block_engine/
 - ✓ Port assignments
 - ✓ Entity sync hub
 - ✓ Wire protocol
-- ✓ Tests (56/56 passing)
+- ✓ Tests (local snapshot: 85 passed / 1 failed)
 - ✓ Server startup behavior
 
 **Breaking Changes:**

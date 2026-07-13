@@ -11,3 +11,7 @@ Core package containing:
 
 __version__ = "1.0.0"
 __author__ = "Block-Offset Team"
+
+from .core_api import CORE_API_VERSION, BOECoreAPI
+
+__all__ = ["__version__", "__author__", "CORE_API_VERSION", "BOECoreAPI"]

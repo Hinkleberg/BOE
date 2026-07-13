@@ -24,6 +24,7 @@ from flat_store import FlatStore
 from render_store import RenderStore
 from resilient_store import ResilientStore
 from entity_sidecar import EntitySidecar, EntityRecord, EntityType, EntityFlags
+from spatial_index import SpatialIndex
 from render_feed import RenderFeedServer
 from mirror_health_monitor import MirrorHealthMonitor, MirrorStatus
 from tools.unreal.unreal_adapter import UnrealAdapter
@@ -48,7 +49,10 @@ def main() -> None:
     rs      = ResilientStore(store_a, journal_path=args.journal)
     rs.register_mirror(store_b.enqueue_forward_sync)
 
-    sidecar = EntitySidecar(args.sidecar)
+    spatial_index = SpatialIndex(chunk_dim=16)
+    sidecar = EntitySidecar(args.sidecar, spatial_index=spatial_index)
+    rebuilt = sidecar.rebuild_spatial_index()
+    print(f"Spatial index rebuild complete: {rebuilt} entities indexed")
 
     # Engine adapters — UE5 :7100 | Blender :7200 | Omniverse :7300 | Roblox :7400 | Godot :7500 | O3DE :7502 | Unity :7503
     # NOTE: This is legacy non-duplex configuration. Use start_duplex_server.py for full-duplex with entity sync.

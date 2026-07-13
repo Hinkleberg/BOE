@@ -490,7 +490,7 @@ async def on_entity_sync(event: EntityEvent):
 - [x] ENTITY_COMMAND (0x27) and ENTITY_SYNC_EVENT (0x13) message types added
 - [x] Entity state broadcast to all clients
 - [x] Real-time bidirectional sync operational
-- [x] Backward compatibility maintained (56/56 tests passing)
+- [x] Backward compatibility maintained (current local snapshot: 85 passed / 1 failed overall)
 - [ ] Client implementations (Unreal C++, Blender Python, Omniverse Python, Roblox Lua)
 - [ ] Load testing across 100+ entities
 - [ ] Documentation for remaining adapters (Godot, Unity, O3DE, Military, etc.)

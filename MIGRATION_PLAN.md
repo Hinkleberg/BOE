@@ -4,6 +4,12 @@ Migration plan for full-duplex conversion of all adapters.
 
 Status: COMPREHENSIVE MIGRATION IN PROGRESS
 
+Update (2026-07-13):
+  ✓ Web compare mode now uses dual WebBridge endpoints:
+    - WebBridge Dev (7507)
+    - WebBridge Live (7508)
+  ✓ Start command supports: --live-db, --web-dev-port, --web-live-port
+
 Current Full-Duplex (4 adapters):
   ✓ UnrealAdapter (7100)
   ✓ BlenderAdapter (7200)

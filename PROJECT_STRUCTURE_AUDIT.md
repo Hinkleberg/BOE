@@ -168,7 +168,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src', 'block_engine'
 - ✓ No circular dependencies
 - ✓ No broken imports
 - ✓ All ports unique (7100-7509, 8000)
-- ✓ Tests still passing (56/56)
+- ✓ Tests snapshot updated (85 passed / 1 failed)
 
 ### FUTURE (Phase 6)
 
@@ -229,7 +229,7 @@ tests/
 | **Import Paths** | ✅ Working | Workaround with sys.path, could be improved |
 | **Port Assignments** | ✅ Perfect | All unique, comprehensive documentation |
 | **Active Adapters** | ✅ Complete | 8 DuplexAdapter-based, all linked correctly |
-| **Tests** | ✅ Passing | 56/56 tests passing |
+| **Tests** | ⚠️ Near-passing | 85 passed / 1 failed |
 | **Documentation** | ✅ Complete | PORT_ALLOCATION.md, ENTITY_SYNC_PROTOCOL.md |
 | **Legacy Cleanup** | ⚠️ Pending | 2 legacy adapters should be deprecated |
 | **Package Structure** | ⚠️ Minor | Missing __init__.py files (not critical) |

@@ -153,8 +153,10 @@ async def main():
     if not os.path.exists(WORLD_PATH):
         generate(layout, rs)
 
-    sidecar = EntitySidecar(SIDECAR_PATH, max_entities=64)
-    spatial_index = SpatialIndex()
+    spatial_index = SpatialIndex(chunk_dim=16)
+    sidecar = EntitySidecar(SIDECAR_PATH, max_entities=64, spatial_index=spatial_index)
+    rebuilt = sidecar.rebuild_spatial_index()
+    print(f"Spatial index rebuild complete: {rebuilt} entities indexed")
     movement_transaction = MovementTransaction(layout, sidecar, spatial_index, journal=JOURNAL_PATH)
     mut = MutationEngine(movement_transaction)
 

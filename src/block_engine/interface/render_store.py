@@ -106,6 +106,7 @@ class RenderStore:
 
         self._conn = self._open_db()
         self._lock = threading.Lock()
+        self._observers: list[Callable[[int, bytes, int], None]] = []
 
         # Sequence tracking
         self._mirror_write_seq: int = self._load_max_seq()
@@ -201,6 +202,11 @@ class RenderStore:
     def mirror_write_seq(self) -> int:
         """Current highest write_seq applied to Array B."""
         return self._mirror_write_seq
+
+    def register_observer(self, callback: Callable[[int, bytes, int], None]) -> None:
+        """Register callback invoked after a forward entry is committed to Array B."""
+        with self._lock:
+            self._observers.append(callback)
 
     # ------------------------------------------------------------------
     # Forward intake (called by ResilientStore after journal commit + quorum)
@@ -322,6 +328,13 @@ class RenderStore:
             self._conn.commit()
             if entry.write_seq > self._mirror_write_seq:
                 self._mirror_write_seq = entry.write_seq
+            observers = list(self._observers)
+
+        for callback in observers:
+            try:
+                callback(entry.offset, entry.data, entry.write_seq)
+            except Exception:
+                pass
 
     def _scan_loop(self) -> None:
         """Background thread: periodic integrity scan of all blocks in Array B."""

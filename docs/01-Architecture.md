@@ -40,7 +40,8 @@ offset(x,y,z) = (z×W×H + y×W + x) × 16 bytes
 - **Godot = 7500** ← (moved up)
 - **O3DE = 7502** ← (moved to 7502)
 - **Unity = 7503** ← (moved to 7503)
-- **WebBridge = 7507** ← (WebSocket 3D viewer)
+- **WebBridge Dev = 7507** ← (Development viewport)
+- **WebBridge Live = 7508** ← (Live mirror viewport)
 
 ### Full-Duplex TCP Adapters (DPLX Protocol)
 
@@ -53,11 +54,12 @@ offset(x,y,z) = (z×W×H + y×W + x) × 16 bytes
 | 7500 | GodotAdapter | Godot 3.x/4.x | 18 | ✅ Active |
 | 7502 | O3DEAdapter | Amazon O3DE | 12 | ✅ Active |
 | 7503 | UnityAdapter | Unity Engine | 15 | ✅ Active |
-| 7507 | WebBridge | WebSocket viewer | N/A | ✅ Active |
+| 7507 | WebBridge (Dev) | WebSocket viewer | N/A | ✅ Active |
+| 7508 | WebBridge (Live) | WebSocket viewer | N/A | ✅ Active |
 
-**Total Commands:** 147 across 8 adapters  
+**Total Commands:** 147 across game-engine adapters  
 **Port Conflicts:** 0  
-**Reserved Ports:** 7501, 7504-7506, 7508-7509
+**Reserved Ports:** 7501, 7504-7506, 7509
 
 ### HTTP & Legacy Ports
 
@@ -226,7 +228,7 @@ Disk Files
 
 ## Web 3D Viewer
 
-**Port:** 7507 (WebSocket)  
+**Ports:** 7507 (Dev WebSocket), 7508 (Live WebSocket)  
 **Protocol:** WebSocket frames with JSON payload  
 **Frontend:** Three.js WebGL renderer  
 **File:** web/index.html
@@ -274,7 +276,7 @@ User sees live 3D
 
 ## Adapter Ecosystem
 
-### Full-Duplex Game Engine Adapters (8 total)
+### Full-Duplex Game Engine Adapters (+ dual web compare endpoints)
 
 Each inherits from `DuplexAdapter` base class:
 - Unified TCP/DPLX networking
@@ -306,6 +308,9 @@ These use the entity_sidecar for metadata but don't expose TCP listeners.
 --adapters all        # Which adapters to start:
                       #   all, game-engines, military,
                       #   scientific, web, minimal
+--live-db world_live.db      # Live mirror DB (Array B compare target)
+--web-dev-port 7507          # Development viewport endpoint
+--web-live-port 7508         # Live viewport endpoint
 ```
 
 **Startup Order (default "all"):**
@@ -316,7 +321,8 @@ These use the entity_sidecar for metadata but don't expose TCP listeners.
 5. Godot (7500)
 6. O3DE (7502)
 7. Unity (7503)
-8. WebBridge (7507)
+8. WebBridge Dev (7507)
+9. WebBridge Live (7508)
 
 ---
 
@@ -329,7 +335,7 @@ These use the entity_sidecar for metadata but don't expose TCP listeners.
 source .venv/bin/activate
 
 # Start all adapters
-python start_duplex_server.py --adapters all
+python start_duplex_server.py --adapters all --live-db world_live.db
 
 # In another terminal, start 3D viewer
 cd web && python -m http.server 8080
@@ -343,7 +349,7 @@ cd web && python -m http.server 8080
 # Run all tests
 pytest tests/ -v
 
-# Expected: 56/56 tests passing
+# Check summary output for current pass/fail counts
 ```
 
 ### Development

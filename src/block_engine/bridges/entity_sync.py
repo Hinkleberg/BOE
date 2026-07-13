@@ -76,6 +76,9 @@ class EntityState:
     parent_entity_id: Optional[int] = None  # For hierarchies
     metadata: Dict[str, Any] = None         # Platform-specific extras
     timestamp: float = 0.0                  # Last modification time
+    version: int = 0                        # Monotonic version for conflict checks
+    lock_owner: str = ""                   # Client currently holding edit lock
+    lock_expires_at: float = 0.0            # UNIX timestamp when lock expires
 
 
 @dataclass
@@ -87,6 +90,16 @@ class EntityEvent:
     source_platform: int = 0           # Which adapter triggered this
     source_client_id: str = ""         # Which client within the adapter
     timestamp: float = 0.0
+
+
+@dataclass
+class ConflictResult:
+    """Outcome of applying an entity event with conflict checks."""
+    accepted: bool
+    reason: str = ""
+    entity_id: int = 0
+    current_version: int = 0
+    locked_by: str = ""
 
 
 class EntitySyncHub:
@@ -105,6 +118,8 @@ class EntitySyncHub:
         """Register new entity or update existing one. Returns entity_id."""
         if state.entity_id == 0:
             state.entity_id = self._generate_entity_id()
+        if state.version <= 0:
+            state.version = 1
         state.timestamp = time.time()
         self._entities[state.entity_id] = state
         return state.entity_id
@@ -120,16 +135,103 @@ class EntitySyncHub:
         Called when any adapter reports an entity change.
         Broadcasts to all other adapters.
         """
-        # Update internal state
-        self._entities[event.entity_state.entity_id] = event.entity_state
-        event.timestamp = time.time()
-        
-        # Broadcast to all listeners (other adapters)
+        self.apply_entity_event(event)
+
+    def apply_entity_event(
+        self,
+        event: EntityEvent,
+        *,
+        expected_version: Optional[int] = None,
+        lock_token: str = "",
+        lock_timeout_s: float = 15.0,
+    ) -> ConflictResult:
+        """
+        Apply entity change with optimistic concurrency + lock ownership checks.
+
+        Rules:
+        - If expected_version is set, reject stale updates.
+        - If entity is locked by another client and lock has not expired, reject.
+        - Successful updates increment entity version.
+        """
+        state = event.entity_state
+        now = time.time()
+
+        if state.entity_id == 0:
+            state.entity_id = self._generate_entity_id()
+
+        current = self._entities.get(state.entity_id)
+
+        if current is not None:
+            # Lock conflict check first; stale locks are ignored.
+            if current.lock_owner and current.lock_expires_at > now:
+                if lock_token and lock_token == current.lock_owner:
+                    pass
+                elif event.source_client_id and event.source_client_id == current.lock_owner:
+                    pass
+                elif event.event_type != EntityEventType.ENTITY_UNLOCKED:
+                    return ConflictResult(
+                        accepted=False,
+                        reason="entity_locked",
+                        entity_id=current.entity_id,
+                        current_version=current.version,
+                        locked_by=current.lock_owner,
+                    )
+
+            if expected_version is not None and expected_version != current.version:
+                return ConflictResult(
+                    accepted=False,
+                    reason="version_conflict",
+                    entity_id=current.entity_id,
+                    current_version=current.version,
+                    locked_by=current.lock_owner,
+                )
+
+        base_version = current.version if current is not None else 0
+        state.version = max(base_version + 1, state.version or 0)
+        state.timestamp = now
+
+        # Handle lock/unlock lifecycle in the canonical state.
+        if event.event_type == EntityEventType.ENTITY_LOCKED:
+            owner = event.source_client_id or lock_token
+            state.lock_owner = owner
+            state.lock_expires_at = now + max(1.0, lock_timeout_s)
+        elif event.event_type == EntityEventType.ENTITY_UNLOCKED:
+            if current is not None and current.lock_owner:
+                owner = event.source_client_id or lock_token
+                if owner and owner != current.lock_owner and current.lock_expires_at > now:
+                    return ConflictResult(
+                        accepted=False,
+                        reason="unlock_denied",
+                        entity_id=current.entity_id,
+                        current_version=current.version,
+                        locked_by=current.lock_owner,
+                    )
+            state.lock_owner = ""
+            state.lock_expires_at = 0.0
+        elif current is not None:
+            # Carry lock forward unless this event modifies lock lifecycle.
+            if current.lock_expires_at > now:
+                state.lock_owner = current.lock_owner
+                state.lock_expires_at = current.lock_expires_at
+            else:
+                state.lock_owner = ""
+                state.lock_expires_at = 0.0
+
+        self._entities[state.entity_id] = state
+        event.timestamp = now
+
         for listener in self._listeners:
             try:
                 listener(event)
             except Exception as e:
                 print(f"[EntitySyncHub] Listener error: {e}")
+
+        return ConflictResult(
+            accepted=True,
+            entity_id=state.entity_id,
+            current_version=state.version,
+            locked_by=state.lock_owner,
+        )
     
     def subscribe_to_entity(self, client_id: str, entity_id: int) -> None:
         """Register client interest in specific entity updates."""
@@ -192,6 +294,9 @@ class EntitySyncHub:
             "color": event.entity_state.color,
             "visible": event.entity_state.visible,
             "locked": event.entity_state.locked,
+            "version": event.entity_state.version,
+            "lock_owner": event.entity_state.lock_owner,
+            "lock_expires_at": event.entity_state.lock_expires_at,
             "parent_entity_id": event.entity_state.parent_entity_id,
             "metadata": event.entity_state.metadata or {},
             "changed_fields": event.changed_fields or [],
@@ -214,6 +319,9 @@ class EntitySyncHub:
             color=tuple(obj.get("color", [1.0, 1.0, 1.0])),
             visible=obj.get("visible", True),
             locked=obj.get("locked", False),
+            version=int(obj.get("version", 0)),
+            lock_owner=obj.get("lock_owner", ""),
+            lock_expires_at=float(obj.get("lock_expires_at", 0.0)),
             parent_entity_id=obj.get("parent_entity_id"),
             metadata=obj.get("metadata", {}),
         )

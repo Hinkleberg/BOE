@@ -340,7 +340,7 @@ Common error codes:
 - [x] Write authorization hooks in place
 - [x] Per-client message queues prevent blocking
 - [x] Subscription filtering operational
-- [x] Backward compatibility verified (56 tests passing)
+- [x] Backward compatibility verified in current local run (85 passed / 1 failed outside adapter command path)
 - [x] Documentation updated (this file)
 - [x] Performance metrics exposed via statistics()
 - [x] Error handling consistent across adapters

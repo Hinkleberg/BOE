@@ -3,118 +3,506 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Block Offset Engine Web Observer</title>
+    <title>BOE Dual Environment Inspector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <style>
-      body { margin: 0; font-family: sans-serif; background: #0f172a; color: #e2e8f0; }
-      #wrap { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
-      aside { padding: 16px; border-right: 1px solid #334155; background: #111827; }
+      :root {
+        --bg: #09121a;
+        --panel: rgba(10, 26, 38, 0.88);
+        --panel-border: rgba(103, 161, 196, 0.34);
+        --fg: #e9f4ff;
+        --muted: #91a8b8;
+        --accent: #1ea7a1;
+        --accent-strong: #f0a22e;
+        --danger: #d55f6f;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Space Grotesk", sans-serif;
+        color: var(--fg);
+        background:
+          radial-gradient(circle at 8% 15%, rgba(240, 162, 46, 0.22), transparent 38%),
+          radial-gradient(circle at 92% 70%, rgba(30, 167, 161, 0.22), transparent 42%),
+          linear-gradient(145deg, #071018, #0e1d2a 52%, #132838);
+      }
+
+      #wrap { display: grid; grid-template-columns: minmax(300px, 390px) 1fr; height: 100vh; }
+
+      aside {
+        padding: 20px;
+        border-right: 1px solid var(--panel-border);
+        backdrop-filter: blur(5px);
+        background: var(--panel);
+        overflow: auto;
+      }
+
+      .scene-grid { display: grid; grid-template-columns: 1fr 1fr; height: 100%; }
+      .scene-grid.single { grid-template-columns: 1fr; }
+      .viewport {
+        position: relative;
+        border-left: 1px solid rgba(145, 168, 184, 0.2);
+      }
+      .viewport:first-child { border-left: 0; }
       canvas { display: block; width: 100%; height: 100%; }
-      .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #2563eb; margin-right: 8px; }
-      pre { font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+
+      .viewport-label {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.78rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--panel-border);
+        background: rgba(7, 17, 25, 0.72);
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 1.42rem;
+        letter-spacing: 0.03em;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        margin: 0 0 14px;
+        font-size: 0.92rem;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 11px;
+        border-radius: 999px;
+        background: rgba(30, 167, 161, 0.17);
+        border: 1px solid rgba(30, 167, 161, 0.44);
+        margin-bottom: 18px;
+        font-size: 0.9rem;
+      }
+
+      .status.offline {
+        background: rgba(213, 95, 111, 0.15);
+        border-color: rgba(213, 95, 111, 0.45);
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 12px var(--accent);
+      }
+
+      .offline .dot {
+        background: var(--danger);
+        box-shadow: 0 0 10px var(--danger);
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .metric {
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: rgba(6, 20, 30, 0.75);
+        animation: rise 480ms ease both;
+      }
+
+      .metric .label {
+        font-size: 0.74rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+      }
+
+      .metric .value {
+        margin-top: 4px;
+        font-size: 1.28rem;
+        font-weight: 700;
+      }
+
+      .panel {
+        border: 1px solid var(--panel-border);
+        border-radius: 14px;
+        margin-bottom: 12px;
+        background: rgba(8, 22, 33, 0.8);
+        padding: 10px 12px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 8px;
+      }
+
+      .field label {
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .field input[type="text"] {
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        background: rgba(5, 16, 25, 0.8);
+        color: var(--fg);
+        padding: 7px 8px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.74rem;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .btn {
+        border: 1px solid rgba(30, 167, 161, 0.5);
+        border-radius: 8px;
+        background: rgba(30, 167, 161, 0.2);
+        color: var(--fg);
+        padding: 8px 11px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .panel h3 {
+        margin: 0 0 8px;
+        font-size: 0.92rem;
+        color: var(--accent-strong);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .mono {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        line-height: 1.4;
+      }
+
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      li {
+        padding: 4px 0;
+        border-bottom: 1px dotted rgba(145, 168, 184, 0.24);
+      }
+
+      li:last-child {
+        border-bottom: 0;
+      }
+
+      @media (max-width: 980px) {
+        #wrap { grid-template-columns: 1fr; }
+        aside { height: 52vh; border-right: 0; border-bottom: 1px solid var(--panel-border); }
+        .scene-grid { height: 48vh; }
+      }
+
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
     </style>
   </head>
   <body>
     <div id="wrap">
       <aside>
-        <h2>Block Offset Engine</h2>
-        <p>Development observer</p>
-        <div id="status">Connecting…</div>
-        <hr />
-        <pre id="log"></pre>
+        <h1>BOE Dual Inspector</h1>
+        <p class="subtitle">Azure-style side-by-side Development vs Live viewport flow.</p>
+        <div id="status" class="status"><span class="dot"></span><span id="status-text">Connecting</span></div>
+
+        <div class="panel">
+          <h3>Connections</h3>
+          <div class="field"><label>Development WebSocket</label><input id="dev-ws" type="text" value="ws://127.0.0.1:7507/ws" /></div>
+          <div class="field"><label>Development Inspector API</label><input id="dev-api" type="text" value="http://127.0.0.1:7507/api/inspector" /></div>
+          <div class="field"><label>Live WebSocket</label><input id="live-ws" type="text" value="ws://127.0.0.1:7508/ws" /></div>
+          <div class="field"><label>Live Inspector API</label><input id="live-api" type="text" value="http://127.0.0.1:7508/api/inspector" /></div>
+          <div class="row">
+            <label class="mono"><input id="dual-toggle" type="checkbox" checked /> Dual viewport mode</label>
+            <button id="apply-connections" class="btn">Apply</button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric"><div class="label">Dev Write Seq</div><div class="value" id="metric-dev-seq">0</div></div>
+          <div class="metric"><div class="label">Live Write Seq</div><div class="value" id="metric-live-seq">0</div></div>
+          <div class="metric"><div class="label">Lag Blocks</div><div class="value" id="metric-lag">0</div></div>
+          <div class="metric"><div class="label">Dev Write Rate (10s)</div><div class="value" id="metric-write-rate">0.00</div></div>
+        </div>
+
+        <div class="panel">
+          <h3>Transactions</h3>
+          <ul id="transactions" class="mono"></ul>
+        </div>
+
+        <div class="panel">
+          <h3>Busiest Chunks</h3>
+          <ul id="chunks" class="mono"></ul>
+        </div>
+
+        <div class="panel">
+          <h3>Adapters</h3>
+          <pre id="adapters" class="mono"></pre>
+        </div>
       </aside>
-      <canvas id="view"></canvas>
+      <div id="scene-grid" class="scene-grid">
+        <div class="viewport">
+          <div class="viewport-label">Development</div>
+          <canvas id="dev-view"></canvas>
+        </div>
+        <div id="live-viewport" class="viewport">
+          <div class="viewport-label">Live</div>
+          <canvas id="live-view"></canvas>
+        </div>
+      </div>
     </div>
 
     <script type="module">
       import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
-      const canvas = document.getElementById('view');
+      const sceneGridEl = document.getElementById('scene-grid');
+      const liveViewportEl = document.getElementById('live-viewport');
+
+      const devWsInput = document.getElementById('dev-ws');
+      const devApiInput = document.getElementById('dev-api');
+      const liveWsInput = document.getElementById('live-ws');
+      const liveApiInput = document.getElementById('live-api');
+      const applyConnectionsBtn = document.getElementById('apply-connections');
+      const dualToggle = document.getElementById('dual-toggle');
+
       const statusEl = document.getElementById('status');
-      const logEl = document.getElementById('log');
+      const statusTextEl = document.getElementById('status-text');
 
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0f172a);
-      const camera = new THREE.PerspectiveCamera(45, 2, 0.1, 2000);
-      camera.position.set(24, 24, 48);
-      camera.lookAt(0, 0, 0);
+      const metricDevSeq = document.getElementById('metric-dev-seq');
+      const metricLiveSeq = document.getElementById('metric-live-seq');
+      const metricLag = document.getElementById('metric-lag');
+      const metricWriteRate = document.getElementById('metric-write-rate');
 
-      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+      const transactionsEl = document.getElementById('transactions');
+      const chunksEl = document.getElementById('chunks');
+      const adaptersEl = document.getElementById('adapters');
 
-      const ambient = new THREE.AmbientLight(0xffffff, 0.7);
-      const directional = new THREE.DirectionalLight(0xffffff, 1.0);
-      directional.position.set(20, 30, 10);
-      scene.add(ambient, directional);
+      function createViewport(canvasId, baseColorHex) {
+        const canvas = document.getElementById(canvasId);
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+        const camera = new THREE.PerspectiveCamera(45, 2, 0.1, 2000);
+        camera.position.set(24, 24, 48);
+        camera.lookAt(0, 0, 0);
 
-      const group = new THREE.Group();
-      scene.add(group);
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
 
-      const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.6, metalness: 0.1 });
-      const geometry = new THREE.BoxGeometry(1, 1, 1);
-      const instanced = new THREE.InstancedMesh(geometry, material, 4096);
-      instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      group.add(instanced);
+        const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+        const directional = new THREE.DirectionalLight(0xffffff, 1.0);
+        directional.position.set(20, 30, 10);
+        scene.add(ambient, directional);
 
-      const dummy = new THREE.Object3D();
-      const blockMap = new Map();
-      let instanceCount = 0;
+        const group = new THREE.Group();
+        scene.add(group);
 
-      function addOrUpdateBlock(entry) {
-        const key = `${entry.x},${entry.y},${entry.z}`;
-        if (blockMap.has(key)) {
-          const object = blockMap.get(key);
+        const material = new THREE.MeshStandardMaterial({ color: baseColorHex, roughness: 0.6, metalness: 0.1 });
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const instanced = new THREE.InstancedMesh(geometry, material, 8192);
+        instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        group.add(instanced);
+
+        const dummy = new THREE.Object3D();
+        const blockMap = new Map();
+        let instanceCount = 0;
+
+        function addOrUpdateBlock(entry) {
+          const key = `${entry.x},${entry.y},${entry.z}`;
+          if (blockMap.has(key)) {
+            const object = blockMap.get(key);
+            dummy.position.set(entry.x, entry.y, entry.z);
+            dummy.updateMatrix();
+            instanced.setMatrixAt(object.instanceId, dummy.matrix);
+            instanced.instanceMatrix.needsUpdate = true;
+            return;
+          }
+          if (instanceCount >= 8192) {
+            return;
+          }
           dummy.position.set(entry.x, entry.y, entry.z);
           dummy.updateMatrix();
-          instanced.setMatrixAt(object.instanceId, dummy.matrix);
-          instanced.instanceMatrix.needsUpdate = true;
-          return;
+          instanced.setMatrixAt(instanceCount, dummy.matrix);
+          instanced.setColorAt(instanceCount, new THREE.Color(baseColorHex));
+          blockMap.set(key, { instanceId: instanceCount });
+          instanceCount += 1;
+          instanced.count = instanceCount;
         }
-        dummy.position.set(entry.x, entry.y, entry.z);
-        dummy.updateMatrix();
-        instanced.setMatrixAt(instanceCount, dummy.matrix);
-        instanced.setColorAt(instanceCount, new THREE.Color(0x60a5fa));
-        blockMap.set(key, { instanceId: instanceCount, entry });
-        instanceCount += 1;
-        instanced.count = instanceCount;
+
+        return {
+          canvas,
+          camera,
+          renderer,
+          addOrUpdateBlock,
+          render(tick) {
+            const t = tick * 0.0002;
+            camera.position.x = 42 * Math.cos(t);
+            camera.position.z = 42 * Math.sin(t);
+            camera.lookAt(0, 0, 0);
+            renderer.render(scene, camera);
+          },
+          resize() {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            renderer.setSize(width, height, false);
+            camera.aspect = width / Math.max(height, 1);
+            camera.updateProjectionMatrix();
+          },
+        };
       }
 
+      const devViewport = createViewport('dev-view', 0x60a5fa);
+      const liveViewport = createViewport('live-view', 0x34d399);
+
       function renderFrame() {
-        renderer.render(scene, camera);
+        const tick = performance.now();
+        devViewport.render(tick);
+        if (dualToggle.checked) {
+          liveViewport.render(tick + 157.0);
+        }
         requestAnimationFrame(renderFrame);
       }
 
-      function logMessage(text) {
-        logEl.textContent = `${new Date().toLocaleTimeString()}\n${text}`;
+      function renderTransactions(items) {
+        transactionsEl.innerHTML = '';
+        items.slice(-8).reverse().forEach((txn) => {
+          const li = document.createElement('li');
+          li.textContent = `#${txn.write_seq} @ (${txn.coord.x},${txn.coord.y},${txn.coord.z}) type=${txn.block_type}`;
+          transactionsEl.appendChild(li);
+        });
       }
 
-      const socket = new WebSocket('ws://127.0.0.1:7507/ws');
-      socket.addEventListener('open', () => {
-        statusEl.innerHTML = '<span class="pill">live</span> connected';
-        logMessage('WebSocket connected');
-      });
-      socket.addEventListener('message', (event) => {
-        const payload = JSON.parse(event.data);
-        if (payload.type === 'snapshot') {
-          payload.blocks.forEach(addOrUpdateBlock);
-          logMessage(`snapshot ${payload.blocks.length} blocks`);
+      function renderChunks(items) {
+        chunksEl.innerHTML = '';
+        if (!items.length) {
+          const li = document.createElement('li');
+          li.textContent = 'No chunk activity yet';
+          chunksEl.appendChild(li);
           return;
         }
-        if (payload.type === 'block_update') {
-          addOrUpdateBlock(payload);
+        items.slice(0, 8).forEach((chunk) => {
+          const li = document.createElement('li');
+          li.textContent = `${chunk.chunk}: ${chunk.writes} writes`;
+          chunksEl.appendChild(li);
+        });
+      }
+
+      function renderInspector(snapshot) {
+        metricDevSeq.textContent = String(snapshot.transactions.last_write_seq || 0);
+        metricWriteRate.textContent = Number(snapshot.performance.write_rate_blocks_per_sec_10s || 0).toFixed(2);
+
+        const comparison = snapshot.adapters.comparison || {};
+        metricLiveSeq.textContent = String(comparison.live_write_seq || 0);
+        metricLag.textContent = String(comparison.lag_blocks || 0);
+
+        renderTransactions(snapshot.transactions.recent || []);
+        renderChunks(snapshot.chunks.busiest || []);
+
+        const adapterStats = snapshot.adapters.adapter_stats || {};
+        adaptersEl.textContent = JSON.stringify(adapterStats, null, 2);
+      }
+
+      async function pollInspector(apiUrl) {
+        try {
+          const res = await fetch(apiUrl, { cache: 'no-store' });
+          if (!res.ok) return;
+          const payload = await res.json();
+          renderInspector(payload);
+        } catch (_err) {
+          // Polling failures are tolerated; WebSocket may still be alive.
         }
+      }
+
+      let devSocket = null;
+      let liveSocket = null;
+
+      function bindSocket(url, viewport, role) {
+        const socket = new WebSocket(url);
+        socket.addEventListener('open', () => {
+          if (role === 'dev') {
+            statusEl.classList.remove('offline');
+            statusTextEl.textContent = 'Development + Live connected';
+          }
+        });
+        socket.addEventListener('message', (event) => {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'snapshot') {
+            payload.blocks.forEach(viewport.addOrUpdateBlock);
+            return;
+          }
+          if (payload.type === 'block_update') {
+            viewport.addOrUpdateBlock(payload);
+          }
+        });
+        socket.addEventListener('close', () => {
+          if (role === 'dev') {
+            statusEl.classList.add('offline');
+            statusTextEl.textContent = 'Development disconnected';
+          }
+        });
+        return socket;
+      }
+
+      function applyConnections() {
+        if (devSocket) devSocket.close();
+        if (liveSocket) liveSocket.close();
+
+        devSocket = bindSocket(devWsInput.value, devViewport, 'dev');
+        liveSocket = bindSocket(liveWsInput.value, liveViewport, 'live');
+      }
+
+      function applyMode() {
+        if (dualToggle.checked) {
+          sceneGridEl.classList.remove('single');
+          liveViewportEl.style.display = '';
+        } else {
+          sceneGridEl.classList.add('single');
+          liveViewportEl.style.display = 'none';
+        }
+      }
+
+      applyConnectionsBtn.addEventListener('click', () => {
+        applyConnections();
       });
-      socket.addEventListener('close', () => {
-        statusEl.textContent = 'Disconnected';
-      });
+      dualToggle.addEventListener('change', applyMode);
+
+      setInterval(() => pollInspector(devApiInput.value), 1000);
 
       window.addEventListener('resize', () => {
-        const width = canvas.clientWidth;
-        const height = canvas.clientHeight;
-        renderer.setSize(width, height, false);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
+        devViewport.resize();
+        liveViewport.resize();
       });
+
+      applyMode();
+      applyConnections();
+      devViewport.resize();
+      liveViewport.resize();
 
       renderFrame();
     </script>

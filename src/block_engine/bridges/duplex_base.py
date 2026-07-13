@@ -531,6 +531,9 @@ class DuplexAdapter:
             entity_id = payload.get("entity_id", 0)
             platform_entity_name = payload.get("platform_entity_name", "")
             entity_type = payload.get("entity_type", "default")
+            expected_version = payload.get("expected_version")
+            lock_token = payload.get("lock_token", "")
+            lock_timeout_s = float(payload.get("lock_timeout_s", 15.0))
             
             # Build entity state
             transform_data = payload.get("transform", {})
@@ -555,6 +558,7 @@ class DuplexAdapter:
                 color=tuple(payload.get("color", [1.0, 1.0, 1.0])),
                 visible=payload.get("visible", True),
                 locked=payload.get("locked", False),
+                version=int(payload.get("version", 0)),
                 parent_entity_id=payload.get("parent_entity_id"),
                 metadata=payload.get("metadata", {}),
             )
@@ -581,6 +585,10 @@ class DuplexAdapter:
                 event_type = EntityEventType.ENTITY_DETACHED
             elif command == "show":
                 event_type = EntityEventType.ENTITY_VISIBLE
+            elif command == "lock":
+                event_type = EntityEventType.ENTITY_LOCKED
+            elif command == "unlock":
+                event_type = EntityEventType.ENTITY_UNLOCKED
             else:
                 event_type = EntityEventType.ENTITY_MODIFIED
             
@@ -594,14 +602,38 @@ class DuplexAdapter:
                 timestamp=time.time(),
             )
             
-            # Broadcast to all other adapters through hub
-            self._entity_sync_hub.on_entity_event(event)
+            result = self._entity_sync_hub.apply_entity_event(
+                event,
+                expected_version=expected_version,
+                lock_token=lock_token,
+                lock_timeout_s=lock_timeout_s,
+            )
+
+            if not result.accepted:
+                response = DuplexMessage(
+                    msg_type=MessageType.RESPONSE,
+                    msg_id=msg.msg_id,
+                    payload={
+                        "status": "conflict",
+                        "reason": result.reason,
+                        "entity_id": result.entity_id,
+                        "current_version": result.current_version,
+                        "locked_by": result.locked_by,
+                    },
+                )
+                client.enqueue_send(response)
+                return
             
             # Send ACK back to client
             response = DuplexMessage(
                 msg_type=MessageType.RESPONSE,
                 msg_id=msg.msg_id,
-                payload={"status": "entity_synced", "entity_id": entity_id}
+                payload={
+                    "status": "entity_synced",
+                    "entity_id": result.entity_id,
+                    "current_version": result.current_version,
+                    "locked_by": result.locked_by,
+                }
             )
             client.enqueue_send(response)
             
@@ -631,6 +663,9 @@ class DuplexAdapter:
                     "color": event.entity_state.color,
                     "visible": event.entity_state.visible,
                     "locked": event.entity_state.locked,
+                    "version": event.entity_state.version,
+                    "lock_owner": event.entity_state.lock_owner,
+                    "lock_expires_at": event.entity_state.lock_expires_at,
                     "metadata": event.entity_state.metadata or {},
                     "source_platform": event.source_platform,
                     "timestamp": event.timestamp,

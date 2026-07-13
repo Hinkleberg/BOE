@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src', 'block_engine'
 
 from authority.flat_store import FlatStore
 from authority.resilient_store import ResilientStore
+from interface.render_store import RenderStore
 from environment.block_layout import WorldLayout
 from environment.world_gen import generate
 from bridges.duplex_base import DuplexAdapter
@@ -46,6 +47,7 @@ from bridges.godot_adapter import GodotAdapter
 from bridges.unity_adapter_duplex import UnityAdapter
 from bridges.o3de_adapter_duplex import O3DEAdapter
 from bridges.web_bridge import WebBridge
+from bridges.entity_sync import get_entity_sync_hub
 
 
 def create_test_world():
@@ -57,9 +59,8 @@ def create_test_world():
         print(f"✓ Using existing world at {world_path}")
     else:
         print(f"Generating new world at {world_path}...")
-        store = FlatStore(world_path)
+        store = FlatStore(world_path, layout)
         generate(store, layout, seed=42)
-        store.close()
         print(f"✓ World generated")
     
     return layout
@@ -68,6 +69,9 @@ def create_test_world():
 def main():
     parser = argparse.ArgumentParser(description="Start COMPLETE full-duplex adapter ecosystem")
     parser.add_argument("--host", default="127.0.0.1", help="Server host")
+    parser.add_argument("--live-db", default="world_live.db", help="Live mirror DB path (Array B)")
+    parser.add_argument("--web-dev-port", type=int, default=7507, help="Development viewport WebSocket/API port")
+    parser.add_argument("--web-live-port", type=int, default=7508, help="Live viewport WebSocket/API port")
     parser.add_argument("--adapters", default="all", 
                        choices=["all", "game-engines", "military", "scientific", "web", "minimal"],
                        help="Adapter set to start")
@@ -79,7 +83,10 @@ def main():
     
     # Create world
     layout = create_test_world()
-    store = ResilientStore("world.img.seq")
+    flat_store = FlatStore("world.img.seq", layout)
+    store = ResilientStore(flat_store, journal_path="world.jrn")
+    live_store = RenderStore(args.live_db, primary_fallback=store.read_block)
+    store.register_mirror(live_store.enqueue_forward_sync)
     print(f"✓ Store opened: {store}\n")
     
     adapters = []
@@ -140,12 +147,60 @@ def main():
             adapters.append(("O3DEAdapter", o3de, 7502))
             print("✓ O3DEAdapter running\n")
             
-            # WebBridge (7507 - WebSocket)
-            print("Starting WebBridge (7507 WebSocket)...")
-            web = WebBridge(layout=layout, host=args.host, port=7507)
+        if args.adapters in ["all", "game-engines", "minimal", "web"]:
+            # WebBridges for Dev/Live side-by-side viewports
+            print(f"Starting Dev WebBridge ({args.web_dev_port} WebSocket)...")
+            web = WebBridge(layout=layout, host=args.host, port=args.web_dev_port)
+            store.register_mirror(web.on_block_forward)
+
+            print(f"Starting Live WebBridge ({args.web_live_port} WebSocket)...")
+            web_live = WebBridge(layout=layout, host=args.host, port=args.web_live_port)
+            live_store.register_observer(web_live.on_block_forward)
+
+            # Core inspector telemetry providers.
+            web.register_status_provider("resilient_store", store.health_report)
+            web.register_status_provider("live_store", lambda: {"mirror_write_seq": live_store.mirror_write_seq})
+            web.register_status_provider("entity_sync", lambda: {
+                "entity_count": len(get_entity_sync_hub().get_all_entities()),
+            })
+            web.register_status_provider(
+                "comparison",
+                lambda: {
+                    "dev_write_seq": store.write_seq,
+                    "live_write_seq": live_store.mirror_write_seq,
+                    "lag_blocks": max(0, store.write_seq - live_store.mirror_write_seq),
+                },
+            )
+
+            web_live.register_status_provider("resilient_store", store.health_report)
+            web_live.register_status_provider("live_store", lambda: {"mirror_write_seq": live_store.mirror_write_seq})
+            web_live.register_status_provider("entity_sync", lambda: {
+                "entity_count": len(get_entity_sync_hub().get_all_entities()),
+            })
+            web_live.register_status_provider(
+                "comparison",
+                lambda: {
+                    "dev_write_seq": store.write_seq,
+                    "live_write_seq": live_store.mirror_write_seq,
+                    "lag_blocks": max(0, store.write_seq - live_store.mirror_write_seq),
+                },
+            )
+
             web.start()
-            adapters.append(("WebBridge", web, 7507))
-            print("✓ WebBridge running\n")
+            web_live.start()
+            adapters.append(("WebBridge", web, args.web_dev_port))
+            adapters.append(("WebBridgeLive", web_live, args.web_live_port))
+            print("✓ Dev/WebBridge + Live/WebBridge running\n")
+
+            # Adapter health provider map for inspector.
+            web.register_status_provider(
+                "adapter_stats",
+                lambda: {
+                    name: adapter.statistics()
+                    for name, adapter, _port in adapters
+                    if hasattr(adapter, "statistics")
+                },
+            )
         
         print("\n" + "=" * 80)
         print("ADAPTERS RUNNING")
@@ -177,13 +232,15 @@ def main():
         print('    {"command": "spawn_entity", "args": {"entity_id": 1, "name": "TestEntity"}}')
         print("\n  Unity (7503):")
         print('    {"command": "instantiate_prefab", "args": {"obj_id": 1, "prefab": "Cube"}}')
-        print("\n  WebBridge (7507 WebSocket):")
-        print('    ws://127.0.0.1:7507/ws')
+        print(f"\n  Dev WebBridge ({args.web_dev_port} WebSocket):")
+        print(f'    ws://127.0.0.1:{args.web_dev_port}/ws')
+        print(f"\n  Live WebBridge ({args.web_live_port} WebSocket):")
+        print(f'    ws://127.0.0.1:{args.web_live_port}/ws')
         
         print("\n" + "=" * 80)
         print("PORT ALLOCATION SUMMARY (NO CONFLICTS)")
         print("=" * 80)
-        print("  TCP Duplex Ports:  7100-7509 (8 adapters, reserved for future)")
+        print("  TCP Duplex Ports:  7100-7509 (adapters + dual web endpoints)")
         print("  HTTP Ports:        8000 (Roblox legacy API)")
         print("  DIS Protocol:      3000 (MilitarySimAdapter - optional)")
         print("  gRPC Ports:        9200 (StarlinkAdapter - optional)")
@@ -206,6 +263,12 @@ def main():
                 print(f"✓ {name} stopped")
             except Exception as e:
                 print(f"✗ {name} error: {e}")
+
+        try:
+            live_store.close()
+            print("✓ Live mirror store stopped")
+        except Exception as e:
+            print(f"✗ Live mirror store error: {e}")
         
         print("✓ Shutdown complete")
 

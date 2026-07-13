@@ -43,7 +43,7 @@ import struct
 import threading
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Iterator, List, Optional
+from typing import Any, Iterator, List, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -142,11 +142,55 @@ class EntitySidecar:
     All operations are O(1): one seek per read/write.
     """
 
-    def __init__(self, path: str, max_entities: int = MAX_ENTITIES_DEFAULT):
+    def __init__(
+        self,
+        path: str,
+        max_entities: int = MAX_ENTITIES_DEFAULT,
+        spatial_index: Any = None,
+    ):
         self._path = path
         self._max  = max_entities
         self._lock = threading.Lock()
+        self._spatial_index = spatial_index
         self._ensure()
+
+    # ---------------------------------------------------------- index wiring
+
+    def set_spatial_index(self, spatial_index: Any, *, rebuild: bool = True) -> None:
+        self._spatial_index = spatial_index
+        if rebuild and self._spatial_index is not None:
+            self.rebuild_spatial_index()
+
+    def rebuild_spatial_index(self) -> int:
+        """Rebuild derived in-memory spatial index from sidecar truth."""
+        if self._spatial_index is None:
+            return 0
+        if hasattr(self._spatial_index, "clear"):
+            self._spatial_index.clear()
+
+        count = 0
+        with self._lock:
+            with open(self._path, "rb") as f:
+                for eid in range(1, self._max):
+                    f.seek(eid * ENTITY_SLOT_SIZE)
+                    raw = f.read(ENTITY_SLOT_SIZE)
+                    if len(raw) < ENTITY_SLOT_SIZE:
+                        break
+                    if raw == b"\x00" * ENTITY_SLOT_SIZE:
+                        continue
+                    rec = EntityRecord.from_bytes(raw)
+                    if rec.is_empty:
+                        continue
+                    self._spatial_index.upsert_entity(
+                        rec.entity_id,
+                        rec.x,
+                        rec.y,
+                        rec.z,
+                        entity_type=rec.entity_type,
+                        owner_id=rec.owner_id,
+                    )
+                    count += 1
+        return count
 
     def _ensure(self) -> None:
         expected = self._max * ENTITY_SLOT_SIZE
@@ -172,6 +216,15 @@ class EntitySidecar:
         if rec.entity_id >= self._max:
             raise ValueError(f"entity_id {rec.entity_id} exceeds max {self._max}")
         self.write_entity_raw(rec.entity_id, rec.to_bytes())
+        if self._spatial_index is not None:
+            self._spatial_index.upsert_entity(
+                rec.entity_id,
+                rec.x,
+                rec.y,
+                rec.z,
+                entity_type=rec.entity_type,
+                owner_id=rec.owner_id,
+            )
 
     def write_entity_raw(self, entity_id: int, raw_bytes: bytes) -> None:
         if entity_id == 0:
@@ -217,6 +270,8 @@ class EntitySidecar:
             with open(self._path, "r+b") as f:
                 f.seek(offset)
                 f.write(b"\x00" * ENTITY_SLOT_SIZE)
+        if self._spatial_index is not None:
+            self._spatial_index.remove_entity(entity_id)
 
     # ---------------------------------------------------------------- alloc
 
@@ -254,11 +309,24 @@ class EntitySidecar:
 
     def entities_near(self, x: float, y: float, z: float, radius: float) -> List[EntityRecord]:
         """
-        Linear scan spatial query. Replace with R-tree or spatial hash
-        for production entity counts above a few thousand.
+        Spatial query using chunk-grid shortlist when index is attached,
+        with linear scan fallback for compatibility.
         """
         r2 = radius * radius
         results: List[EntityRecord] = []
+
+        if self._spatial_index is not None and hasattr(self._spatial_index, "query_radius_candidates"):
+            for entity_id in self._spatial_index.query_radius_candidates(x, y, z, radius):
+                rec = self.read_entity(int(entity_id))
+                if rec is None:
+                    continue
+                dx = rec.x - x
+                dy = rec.y - y
+                dz = rec.z - z
+                if dx * dx + dy * dy + dz * dz <= r2:
+                    results.append(rec)
+            return results
+
         with self._lock:
             with open(self._path, "rb") as f:
                 for eid in range(1, self._max):
@@ -277,7 +345,8 @@ class EntitySidecar:
         return results
 
     def __repr__(self) -> str:
-        return f"EntitySidecar({self._path!r}, max={self._max})"
+        mode = "indexed" if self._spatial_index is not None else "linear"
+        return f"EntitySidecar({self._path!r}, max={self._max}, query={mode})"
 
 
 # ---------------------------------------------------------------------------

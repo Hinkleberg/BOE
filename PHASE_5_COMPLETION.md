@@ -65,7 +65,7 @@ class EntitySyncHub:
 **Zero Breaking Changes:**
 - All existing adapters inherit automatically
 - Legacy APIs unchanged
-- Tests: 56/56 still passing
+- Tests: local snapshot 85 passed / 1 failed
 
 ---
 
@@ -302,7 +302,7 @@ while True:
 ```
 
 **Before:** 56/56 tests passing
-**After:** 56/56 tests passing
+**After (current local snapshot):** 85 passed / 1 failed
 **Regressions:** ZERO
 **Backward Compatibility:** 100%
 
@@ -333,7 +333,7 @@ while True:
 | Event broadcasting | ✅ Complete | Hub listener pattern working |
 | Message protocol | ✅ Complete | ENTITY_COMMAND + ENTITY_SYNC_EVENT |
 | Documentation | ✅ Complete | ENTITY_SYNC_PROTOCOL.md comprehensive |
-| Testing | ✅ Complete | 56/56 tests passing, zero regressions |
+| Testing | ⚠️ Snapshot Updated | 85 passed / 1 failed (one known integration failure) |
 | Server startup | ✅ Verified | All adapters launch with entity sync |
 | Git commit | ✅ Complete | Pushed to main branch |
 
@@ -377,7 +377,7 @@ while True:
 |--------|-------|--------|
 | Lines of Code Added | ~450 | ✅ |
 | Cyclomatic Complexity | 8 avg | ✅ Good |
-| Test Coverage | 56/56 passing | ✅ 100% |
+| Test Coverage | 85 passed / 1 failed | ⚠️ Near-complete |
 | Backward Compatibility | 100% | ✅ |
 | Documentation | Complete | ✅ |
 
@@ -453,5 +453,5 @@ The architecture is:
 
 ---
 
-**Last Updated:** 2026-07-12 | **Status:** COMPLETE | **Tests:** 56/56 ✅
+**Last Updated:** 2026-07-13 | **Status:** COMPLETE | **Tests:** 85 passed / 1 failed ⚠️
 

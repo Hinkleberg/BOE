@@ -84,7 +84,7 @@ python -m pytest tests/ -v
 - `test_security_tooling.py` (write authorization)
 - `test_web_bridge.py` (WebSocket server)
 
-**Current status:** 56/56 tests passing ✅
+**Current status (2026-07-13 local run):** 85 passed / 1 failed (`python/integration_test.py::test_world_simulation`) ⚠️
 
 **Single test file:**
 ```bash
@@ -150,7 +150,16 @@ source .venv/bin/activate
 python start_duplex_server.py --host 127.0.0.1 --adapters all
 ```
 
-**What it starts (8 full-duplex adapters):**
+Optional dual-environment compare flags:
+
+```bash
+python start_duplex_server.py --adapters all \
+    --live-db world_live.db \
+    --web-dev-port 7507 \
+    --web-live-port 7508
+```
+
+**What it starts (7 game adapters + 2 web compare endpoints):**
 - UnrealAdapter (7100)
 - BlenderAdapter (7200)
 - OmniverseConnector (7300)
@@ -158,19 +167,23 @@ python start_duplex_server.py --host 127.0.0.1 --adapters all
 - GodotAdapter (7500)
 - O3DEAdapter (7502) ← **Current, full-duplex implementation**
 - UnityAdapter (7503) ← **Current, full-duplex implementation**
-- WebBridge (7507) ← **WebSocket 3D viewer**
+- WebBridge Dev (7507) ← **Development viewport**
+- WebBridge Live (7508) ← **Live mirror viewport**
 
 **`--adapters` options:**
-- `all` - Start all 8 game engine adapters (recommended)
+- `all` - Start all game engine adapters + Dev/Live WebBridge endpoints (recommended)
 - `game-engines` - Same as `all` (currently identical code)
 - `minimal` - Same as `all` (currently identical code)
-- `web` - Start only WebBridge (port 7507)
+- `web` - Start only WebBridge Dev + Live endpoints (7507 and 7508)
 - `military`, `scientific` - Accepted by parser but **no corresponding code** (start nothing)
 
 **Note:** `--adapters military` and `--adapters scientific` parse but have no implementation. They're optional flags for potential future expansion; currently they parse but don't start any adapters.
 
 **Auto-world generation:**
 Both launchers auto-generate a world on first run if none exists at the default path (`world.img.seq` for Option B).
+
+**Entity spatial index bootstrap:**
+Server startup now rebuilds the in-memory chunk-grid spatial index from the entity sidecar before serving queries. This keeps `entities_near` fast after restart while preserving sidecar-on-disk as source of truth.
 
 ---
 
@@ -180,7 +193,7 @@ Both launchers auto-generate a world on first run if none exists at the default 
 - Matches `PORT_ALLOCATION.md` (dated 2026-07-12, marked Production Ready)
 - Uses current, full-duplex adapter implementations
 - WebSocket 3D viewer included
-- All 56 tests pass with Option B
+- Option B startup and dual Dev/Live inspector endpoints validated in local runtime smoke tests
 - Option A's ports conflict with Option B if you try to run both
 
 **If you're already using Option A:**
@@ -222,9 +235,27 @@ cd web && python -m http.server 8080
 - Light blue cubes (0x60a5fa) with standard lighting
 
 **WebSocket connection:**
-- Port: 7507
-- Endpoint: `ws://127.0.0.1:7507/ws`
+- Development endpoint: `ws://127.0.0.1:7507/ws`
+- Live endpoint: `ws://127.0.0.1:7508/ws`
 - Protocol: JSON frames (`snapshot` or `block_update` messages)
+
+The web UI supports single or dual viewport mode with configurable Dev/Live URLs.
+
+### Inspector telemetry API (Option B)
+
+The WebBridge now exposes a live inspector snapshot endpoint:
+
+```bash
+curl http://127.0.0.1:7507/api/inspector
+curl http://127.0.0.1:7508/api/inspector
+```
+
+Includes:
+- transaction stream (`recent` writes)
+- active and busiest chunks
+- entity sync counts
+- per-adapter statistics
+- write-rate metrics (10-second window)
 
 ---
 
@@ -254,7 +285,8 @@ All platforms connect via TCP to the DPLX wire protocol endpoint.
 | Godot 3.x/4.x | 7500 | ✅ Full-duplex | Active |
 | Amazon O3DE | 7502 | ✅ Full-duplex | Active |
 | Unity Engine | 7503 | ✅ Full-duplex | Active |
-| Web Browser | 7507 | ✅ WebSocket | Active |
+| Web Browser (Dev) | 7507 | ✅ WebSocket | Active |
+| Web Browser (Live) | 7508 | ✅ WebSocket | Active |
 
 ### Unreal Engine 5
 
@@ -443,7 +475,8 @@ cd web && python -m http.server 8080
 ```
 
 **WebSocket connection:** Automatic (JavaScript in `web/index.html` handles it)
-- Endpoint: `ws://127.0.0.1:7507/ws`
+- Development endpoint: `ws://127.0.0.1:7507/ws`
+- Live endpoint: `ws://127.0.0.1:7508/ws`
 - Protocol: JSON frames
 - Auto-reconnects on disconnect
 

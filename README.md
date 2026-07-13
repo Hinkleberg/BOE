@@ -397,7 +397,7 @@ Parallel entity state image. Entity state is intentionally separated from the wo
 - The block image references entities via the `entity_hint` field — a byte offset into the sidecar — so the render feed jumps from a block read to the entity record with one additional offset lookup, no join, no query.
 - `write_entity()` / `read_entity()` / `delete_entity()` — O(1) upsert and lookup.
 - `tick_delta(since_tick)` — all entities updated after a given engine tick; used by the render feed to build entity deltas.
-- `entities_near(x, y, z, radius)` — spatial query for AI tick and render feed view frustum.
+- `entities_near(x, y, z, radius)` — chunk-grid shortlist query + exact distance filter for AI tick and render feed view frustum.
 - `allocate_id()` — returns the lowest unused entity slot.
 
 ```python
@@ -836,18 +836,30 @@ Writes a 64×64×64 block world through the full mutation engine stack. Both Arr
 **3. Run the server:**
 
 ```
-python tools/run_server.py --array-a world.db --array-b world_render.db --sidecar entities.db --size 64
+python start_duplex_server.py --host 127.0.0.1 --adapters all \
+    --live-db world_live.db \
+    --web-dev-port 7507 \
+    --web-live-port 7508
 ```
 
-Runs at 20 Hz. Health report every 2 seconds. Ctrl-C for clean shutdown.
+Starts full-duplex engine adapters plus dual Dev/Live web compare endpoints.
 
-**4. Run the thin client:**
+**4. Run the web dual inspector UI:**
+
+```
+cd web && python -m http.server 8080
+# Open: http://localhost:8080
+```
+
+Use dual viewport mode to compare Development (7507) and Live mirror (7508) in parallel.
+
+**5. Run the thin client (optional):**
 
 ```
 python client.py
 ```
 
-**5. Run the dual-array wiring example:**
+**6. Run the dual-array wiring example:**
 
 ```
 python example_dual_array.py
@@ -855,15 +867,15 @@ python example_dual_array.py
 
 Demonstrates the dual-array setup in isolation — writes blocks through Array A, reads them back from Array B, prints the health report.
 
-**6. Run full test suite (core + tooling + adapters):**
+**7. Run full test suite (core + tooling + adapters):**
 
 ```
 python -m pytest tests/ -v
 ```
 
-Runs all 56 tests: 29 core engine tests, 1 render queue test, 1 web bridge test, 1 metrics test, 6 security tests, 10 reliability tests, and 11 domain adapter tests. All passing.
+Project-local snapshot (2026-07-13): 85 passed / 1 failed in `python/integration_test.py::test_world_simulation`.
 
-**7. Run with observability (metrics):**
+**8. Run with observability (metrics):**
 
 ```python
 from src.block_engine.replication.metrics_exporter import WritePathMetricsCollector
@@ -877,7 +889,7 @@ print(collector.prometheus_text())  # Prometheus-format metrics
 snapshot = collector.snapshot()  # Detailed latency breakdown
 ```
 
-**8. Run with security policies:**
+**9. Run with security policies:**
 
 ```python
 from src.block_engine.replication.write_authorization import (
@@ -896,7 +908,7 @@ if result.status == WriteAuthStatus.ALLOWED:
     resilient_store.write_block(offset, data)
 ```
 
-**9. Start integrity scanner (corruption detection):**
+**10. Start integrity scanner (corruption detection):**
 
 ```python
 from src.block_engine.replication.integrity_validator import IntegrityValidator
@@ -959,7 +971,7 @@ print(verifier.report(results))  # Verify all crash scenarios work
 - `max_blocks` should match the total block count of your flat world image so the engine enforces the same address space geometry as the underlying storage array.
 - The async mirror forward in ResilientStore fires outside the write lock. Array B never adds latency to mutation throughput regardless of mirror count.
 - Hardware I/O (`io_uring`, `O_DIRECT`) is stubbed for future integration. The logic layer is complete and hardware-independent.
-- Entity spatial queries (`entities_near`) are linear scans in this prototype. Replace with an R-tree or spatial hash for production entity counts above a few thousand.
+- Entity spatial queries (`entities_near`) now use a chunk-aligned spatial grid index (16x16x16 bucket model) with exact distance filtering on candidates. The sidecar remains source-of-truth; index is rebuilt at startup.
 - Terrain noise uses SHA-256 digests as a portable, dependency-free substitute for Perlin/Simplex noise. Same seed, same world — deterministic for crash-recovery validation and regression testing.
 
 ### Observability & Tooling (All External)
@@ -984,6 +996,18 @@ print(verifier.report(results))  # Verify all crash scenarios work
 - Observer callback is None? Function returns immediately on the first check.
 
 The engine pays zero cost for any tooling it does not use. Plug in only what you need.
+
+### Current Pipeline Latency Snapshot (2026-07-13, local benchmark)
+
+Measured with `N=1000` writes using `ResilientStore` and `RenderStore` in this workspace:
+
+| Path | p50 (ms) | p95 (ms) | avg (ms) | max (ms) |
+|------|----------|----------|----------|----------|
+| Authority write only | 0.0114 | 0.0122 | 0.0115 | 0.0838 |
+| Authority write with live mirror attached | 0.0732 | 0.1369 | 0.0809 | 0.3132 |
+| Async mirror propagation (dev -> live visibility) | 1.0350 | 1.0531 | 1.0293 | 1.2461 |
+
+These numbers describe storage pipeline behavior on local hardware and should be treated as an operational baseline, not end-to-end input-to-photon latency.
 
 ---
 

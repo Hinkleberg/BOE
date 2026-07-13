@@ -18,13 +18,13 @@ import base64
 import hashlib
 import json
 import socket
-import socketserver
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 from block_engine.environment.block_layout import Block, WorldLayout
 
@@ -52,6 +52,17 @@ class _WebSocketHandler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/api/inspector":
+            payload = json.dumps(self._bridge.inspector_snapshot()).encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+
         if self.path != "/ws":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -93,6 +104,10 @@ class WebBridge:
         self._lock = threading.Lock()
         self._blocks: Dict[int, WebBlockEntry] = {}
         self._clients: List[socket.socket] = []
+        self._status_providers: Dict[str, Callable[[], Dict[str, Any]]] = {}
+        self._recent_transactions: deque[Dict[str, Any]] = deque(maxlen=200)
+        self._chunk_touch_count: Dict[str, int] = {}
+        self._write_timestamps: deque[float] = deque(maxlen=1000)
         self._last_event_id = 0
         self._running = False
         self._server: ThreadingHTTPServer | None = None
@@ -125,6 +140,7 @@ class WebBridge:
         with self._lock:
             self._clients.append(client)
         client.settimeout(1.0)
+        self._send_frame(client, json.dumps(self.snapshot()).encode("utf-8"))
 
     def _remove_client(self, client: socket.socket) -> None:
         with self._lock:
@@ -171,6 +187,21 @@ class WebBridge:
 
         with self._lock:
             self._blocks[offset] = entry
+            cx, cy, cz = self._layout.chunk_coords(x, y, z)
+            chunk_key = f"{cx},{cy},{cz}"
+            self._chunk_touch_count[chunk_key] = self._chunk_touch_count.get(chunk_key, 0) + 1
+            now = time.time()
+            self._write_timestamps.append(now)
+            self._recent_transactions.append(
+                {
+                    "ts": now,
+                    "offset": offset,
+                    "coord": {"x": x, "y": y, "z": z},
+                    "chunk": {"x": cx, "y": cy, "z": cz},
+                    "write_seq": int(write_seq),
+                    "block_type": int(block.block_type),
+                }
+            )
             self._last_event_id += 1
             event_id = self._last_event_id
 
@@ -192,6 +223,11 @@ class WebBridge:
     def register_client(self, client: Any) -> None:
         with self._lock:
             self._clients.append(client)
+
+    def register_status_provider(self, name: str, callback: Callable[[], Dict[str, Any]]) -> None:
+        """Register named telemetry provider for inspector snapshots."""
+        with self._lock:
+            self._status_providers[name] = callback
 
     def _broadcast(self, payload: Dict[str, Any]) -> None:
         frame = json.dumps(payload).encode("utf-8")
@@ -229,3 +265,49 @@ class WebBridge:
                 "block_count": len(self._blocks),
                 "port": self._port,
             }
+
+    def inspector_snapshot(self) -> Dict[str, Any]:
+        now = time.time()
+        with self._lock:
+            providers = dict(self._status_providers)
+            recent_transactions = list(self._recent_transactions)
+            chunk_touch_count = dict(self._chunk_touch_count)
+            write_timestamps = list(self._write_timestamps)
+
+        # Approximate short-window write throughput.
+        write_rate_10s = sum(1 for ts in write_timestamps if (now - ts) <= 10.0) / 10.0
+
+        adapter_status: Dict[str, Any] = {}
+        for name, callback in providers.items():
+            try:
+                adapter_status[name] = callback()
+            except Exception as exc:
+                adapter_status[name] = {"status": "error", "error": str(exc)}
+
+        busiest_chunks = sorted(
+            chunk_touch_count.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )[:10]
+
+        return {
+            "bridge": self.status(),
+            "transactions": {
+                "recent": recent_transactions,
+                "recent_count": len(recent_transactions),
+                "last_write_seq": recent_transactions[-1]["write_seq"] if recent_transactions else 0,
+            },
+            "chunks": {
+                "active_chunks": len(chunk_touch_count),
+                "busiest": [
+                    {"chunk": key, "writes": writes} for key, writes in busiest_chunks
+                ],
+            },
+            "entities": adapter_status.get("entity_sync", {}),
+            "adapters": adapter_status,
+            "performance": {
+                "write_rate_blocks_per_sec_10s": round(write_rate_10s, 2),
+                "viewer_clients": self.status().get("client_count", 0),
+            },
+            "ts": now,
+        }
