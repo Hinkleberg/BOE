@@ -115,6 +115,7 @@ class RenderStore:
             maxsize=forward_queue_maxsize
         )
         self._queue_maxsize = forward_queue_maxsize
+        self._setup_thread_queue(forward_queue_maxsize)
 
         # Background threads
         self._drain_thread = threading.Thread(
@@ -276,11 +277,12 @@ class RenderStore:
     # Override __init__ to set up the thread queue bridge
     def _setup_thread_queue(self, maxsize: int) -> None:
         import queue
-        self._tqueue: "queue.Queue[ForwardEntry | None]" = __import__("queue").Queue(
-            maxsize=maxsize
-        )
+
+        self._tqueue: "queue.Queue[ForwardEntry | None]" = queue.Queue(maxsize=maxsize)
 
     def _thread_enqueue(self, entry: ForwardEntry) -> bool:
+        if not hasattr(self, "_tqueue") or self._tqueue is None:
+            self._setup_thread_queue(self._queue_maxsize)
         try:
             self._tqueue.put_nowait(entry)
             return True
@@ -295,10 +297,9 @@ class RenderStore:
     def _drain_loop(self) -> None:
         """Background thread: drain the thread queue and apply blocks to Array B."""
         import queue as _queue
-        # Lazy-init the thread queue here so it happens in the right thread context
-        self._tqueue: "_queue.Queue[ForwardEntry | None]" = _queue.Queue(
-            maxsize=self._queue_maxsize
-        )
+
+        if not hasattr(self, "_tqueue") or self._tqueue is None:
+            self._setup_thread_queue(self._queue_maxsize)
         while not self._stop_event.is_set():
             try:
                 entry: Optional[ForwardEntry] = self._tqueue.get(timeout=0.05)
