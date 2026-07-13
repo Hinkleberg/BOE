@@ -85,7 +85,7 @@ class WebBridge:
         layout: WorldLayout,
         *,
         host: str = "127.0.0.1",
-        port: int = 7500,
+        port: int = 7507,
     ) -> None:
         self._layout = layout
         self._host = host

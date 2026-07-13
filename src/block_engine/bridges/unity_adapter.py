@@ -49,7 +49,7 @@ class UnityAdapter:
         layout: WorldLayout,
         *,
         host:       str  = "127.0.0.1",
-        port:       int  = 7200,
+        port:       int  = 7503,
         use_binary: bool = True,
     ):
         self._layout     = layout

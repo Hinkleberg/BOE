@@ -51,7 +51,7 @@ class O3DEAdapter:
         layout: WorldLayout,
         *,
         host:        str   = "127.0.0.1",
-        port:        int   = 7300,
+        port:        int   = 7502,
         use_binary:  bool  = True,
         block_scale: float = 0.66,    # metres per block
     ):

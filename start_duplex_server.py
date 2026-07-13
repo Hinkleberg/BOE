@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
 """
 Start COMPLETE full-duplex adapter ecosystem.
-ALL 14 adapters with unified bidirectional communication.
+ALL adapters with unified bidirectional communication.
 
-Port Assignments (7100-7509):
+Port Assignments (TCP Duplex 7100-7509, No Conflicts):
   7100 - UnrealAdapter (Unreal Engine)
   7200 - BlenderAdapter (Blender 4.x)
   7300 - OmniverseConnector (NVIDIA Omniverse)
-  7400 - RobloxHTTPAdapter (Duplex) + 8000 (HTTP)
-  7500 - GodotAdapter (Godot 4.x)
-  7501 - Godot4Bridge (Godot 4.x native)
+  7400 - RobloxHTTPAdapter (TCP Duplex) + 8000 (HTTP)
+  7500 - GodotAdapter (Godot 3.x)
   7502 - O3DEAdapter (Amazon O3DE)
   7503 - UnityAdapter (Unity Engine)
-  7504 - MilitarySimAdapter (HLA/RTI)
-  7505 - AVSimAdapter (Autonomous vehicles)
-  7506 - ScientificSimAdapter (Scientific)
-  7507 - WebBridge (Web 3D)
-  7508 - StarlinkAdapter (Satellites)
-  7509 - HLAFederateBridge (HLA Federation)
+  7507 - WebBridge (Web 3D / WebSocket)
+
+Reserved/Non-Duplex:
+  3000 - MilitarySimAdapter (DIS Protocol)
+  9200 - StarlinkAdapter (gRPC)
+  7501 - Godot4Bridge (reserved for future duplex)
+  7504 - Reserved for future adapters
+  7505 - Reserved for future adapters
+  7506 - Reserved for future adapters
+  7508 - Reserved for future adapters
+  7509 - Reserved for future adapters
 """
 import sys
 import os
@@ -41,6 +45,7 @@ from bridges.roblox_http_adapter import RobloxHTTPAdapter
 from bridges.godot_adapter import GodotAdapter
 from bridges.unity_adapter_duplex import UnityAdapter
 from bridges.o3de_adapter_duplex import O3DEAdapter
+from bridges.web_bridge import WebBridge
 
 
 def create_test_world():
@@ -134,6 +139,13 @@ def main():
             o3de.start()
             adapters.append(("O3DEAdapter", o3de, 7502))
             print("✓ O3DEAdapter running\n")
+            
+            # WebBridge (7507 - WebSocket)
+            print("Starting WebBridge (7507 WebSocket)...")
+            web = WebBridge(layout=layout, host=args.host, port=7507)
+            web.start()
+            adapters.append(("WebBridge", web, 7507))
+            print("✓ WebBridge running\n")
         
         print("\n" + "=" * 80)
         print("ADAPTERS RUNNING")
@@ -152,16 +164,29 @@ def main():
         print("\nEXAMPLE COMMANDS:")
         print("  Unreal (7100):")
         print('    {"command": "move_entity", "args": {"entity_id": 1, "x": 0, "y": 0, "z": 0}}')
-        print("\n  Godot (7500):")
-        print('    {"command": "spawn_actor", "args": {"actor_id": 1, "actor_type": "StaticBody3D"}}')
-        print("\n  Unity (7503):")
-        print('    {"command": "instantiate_prefab", "args": {"obj_id": 1, "prefab": "Cube"}}')
-        print("\n  O3DE (7502):")
-        print('    {"command": "spawn_entity", "args": {"entity_id": 1, "name": "TestEntity"}}')
         print("\n  Blender (7200):")
         print('    {"command": "load_region", "args": {"x": 0, "y": 0, "z": 0, "size": 16}}')
-        print("\n  Roblox (HTTP 8000):")
+        print("\n  Omniverse (7300):")
+        print('    {"command": "paint_block", "args": {"offset": 1000, "block_type": 5}}')
+        print("\n  Roblox (HTTP 8000 / Duplex 7400):")
         print('    GET http://127.0.0.1:8000/roblox/stats')
+        print('    {"command": "respawn", "args": {"player_id": 1}}')
+        print("\n  Godot (7500):")
+        print('    {"command": "spawn_actor", "args": {"actor_id": 1, "actor_type": "StaticBody3D"}}')
+        print("\n  O3DE (7502):")
+        print('    {"command": "spawn_entity", "args": {"entity_id": 1, "name": "TestEntity"}}')
+        print("\n  Unity (7503):")
+        print('    {"command": "instantiate_prefab", "args": {"obj_id": 1, "prefab": "Cube"}}')
+        print("\n  WebBridge (7507 WebSocket):")
+        print('    ws://127.0.0.1:7507/ws')
+        
+        print("\n" + "=" * 80)
+        print("PORT ALLOCATION SUMMARY (NO CONFLICTS)")
+        print("=" * 80)
+        print("  TCP Duplex Ports:  7100-7509 (8 adapters, reserved for future)")
+        print("  HTTP Ports:        8000 (Roblox legacy API)")
+        print("  DIS Protocol:      3000 (MilitarySimAdapter - optional)")
+        print("  gRPC Ports:        9200 (StarlinkAdapter - optional)")
         
         print("\n" + "=" * 80)
         print("Press Ctrl+C to stop servers")
